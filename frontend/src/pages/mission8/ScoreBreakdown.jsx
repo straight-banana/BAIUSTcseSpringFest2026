@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, ResponsiveContainer, Tooltip } from 'recharts';
 import { Calculator, ArrowLeft } from 'lucide-react';
@@ -9,12 +10,52 @@ import Button from '../../components/common/Button.jsx';
 import SectionHeader from '../../components/ui/SectionHeader.jsx';
 import CircularScore from '../../components/mission8/CircularScore.jsx';
 import ScoreBar from '../../components/mission8/ScoreBar.jsx';
-import { getCandidateById, SCORE_WEIGHTS } from '../../mocks/data/mission8.js';
+import LoadingState from '../../components/feedback/Loading.jsx';
+import ErrorState from '../../components/feedback/ErrorState.jsx';
+import { getCurrentRound, getRankedCandidates, weightsToList } from '../../services/candidatesService.js';
 
 export default function ScoreBreakdown() {
   const { id } = useParams();
-  const c = getCandidateById(id);
-  const radar = SCORE_WEIGHTS.map((w) => ({ subject: w.label, score: c.scores[w.key] }));
+  const [c, setC] = useState(null);
+  const [weights, setWeights] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let active = true;
+    getCurrentRound()
+      .then((round) => {
+        if (!active || !round) return null;
+        setWeights(weightsToList(round.weights));
+        return getRankedCandidates(round.id).then((ranked) => ranked.find((p) => p.id === id) || null);
+      })
+      .then((profile) => { if (active) setC(profile); })
+      .catch((err) => { if (active) setError(err?.message || 'Unable to load score breakdown'); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [id]);
+
+  if (loading) {
+    return (
+      <PageContainer>
+        <PageHeader title="Score Breakdown" icon={<Calculator size={18} />} />
+        <Mission8SubNav />
+        <LoadingState label="Loading breakdown..." />
+      </PageContainer>
+    );
+  }
+
+  if (error || !c) {
+    return (
+      <PageContainer>
+        <PageHeader title="Score Breakdown" icon={<Calculator size={18} />} />
+        <Mission8SubNav />
+        <ErrorState title="Couldn't load breakdown" message={error || 'Candidate not found'} />
+      </PageContainer>
+    );
+  }
+
+  const radar = weights.map((w) => ({ subject: w.label, score: c.scores?.[w.key] ?? 0 }));
 
   return (
     <PageContainer>
@@ -33,8 +74,8 @@ export default function ScoreBreakdown() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className="p-5 text-center">
           <SectionHeader title="Overall score" className="!mb-3" />
-          <CircularScore value={c.scores.overall} size={160} stroke={12} label="Overall" />
-          <p className="mt-3 text-xs text-muted">Weighted composite of 7 categories</p>
+          <CircularScore value={c.scores?.overall ?? 0} size={160} stroke={12} label="Overall" />
+          <p className="mt-3 text-xs text-muted">Weighted composite of {weights.length} categories</p>
         </Card>
 
         <Card className="lg:col-span-2 p-4">
@@ -56,8 +97,8 @@ export default function ScoreBreakdown() {
       <Card className="p-4 mt-6">
         <SectionHeader title="Weighted contributions" description="How each factor pushes the overall score" />
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
-          {SCORE_WEIGHTS.map((w) => {
-            const raw = c.scores[w.key];
+          {weights.map((w) => {
+            const raw = c.scores?.[w.key] ?? 0;
             const contribution = +(raw * w.weight).toFixed(1);
             return (
               <div key={w.key}>
@@ -74,9 +115,9 @@ export default function ScoreBreakdown() {
       </Card>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6">
-        {SCORE_WEIGHTS.slice(0, 4).map((w) => (
+        {weights.slice(0, 4).map((w) => (
           <Card key={w.key} className="p-4 text-center">
-            <CircularScore value={c.scores[w.key]} size={80} stroke={7} label={w.label} />
+            <CircularScore value={c.scores?.[w.key] ?? 0} size={80} stroke={7} label={w.label} />
           </Card>
         ))}
       </div>

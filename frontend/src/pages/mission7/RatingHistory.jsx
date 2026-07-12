@@ -1,61 +1,78 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { History } from 'lucide-react';
 import PageContainer from '../../components/layout/PageContainer.jsx';
 import PageHeader from '../../components/layout/PageHeader.jsx';
 import Mission7SubNav from '../../components/mission7/Mission7SubNav.jsx';
 import Card from '../../components/common/Card.jsx';
 import Table from '../../components/common/Table.jsx';
-import Badge from '../../components/ui/Badge.jsx';
 import SearchInput from '../../components/forms/SearchInput.jsx';
-import Select from '../../components/forms/Select.jsx';
 import Pagination from '../../components/ui/Pagination.jsx';
-import StarRating from '../../components/mission7/StarRating.jsx';
+import Avatar from '../../components/ui/Avatar.jsx';
 import EmptyState from '../../components/feedback/EmptyState.jsx';
-import { MY_RATINGS } from '../../mocks/data/mission7.js';
+import LoadingState from '../../components/feedback/Loading.jsx';
+import ErrorState from '../../components/feedback/ErrorState.jsx';
+import { getMyRated } from '../../services/ratingsService.js';
 
 const PAGE_SIZE = 8;
 
 export default function RatingHistory() {
+  const [rated, setRated] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [q, setQ] = useState('');
-  const [status, setStatus] = useState('');
   const [page, setPage] = useState(1);
 
+  useEffect(() => {
+    let active = true;
+    getMyRated()
+      .then((data) => { if (active) setRated(Array.isArray(data) ? data : []); })
+      .catch((err) => { if (active) setError(err?.message || 'Unable to load rating history'); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, []);
+
   const filtered = useMemo(() => {
-    return MY_RATINGS.filter((r) => {
-      if (status && r.status !== status) return false;
-      if (q) return r.studentName.toLowerCase().includes(q.toLowerCase()) || r.roll.includes(q);
-      return true;
-    });
-  }, [q, status]);
+    if (!q) return rated;
+    const t = q.toLowerCase();
+    return rated.filter((r) => r.name.toLowerCase().includes(t) || (r.rollNumber || '').includes(t));
+  }, [rated, q]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const items = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const columns = [
-    { key: 'date',    label: 'Date',    render: (r) => new Date(r.date).toLocaleDateString() },
-    { key: 'studentName', label: 'Student', render: (r) => <div><p className="font-medium text-fg">{r.studentName}</p><p className="text-xs text-muted">{r.roll}</p></div> },
-    { key: 'overall', label: 'Overall', render: (r) => <StarRating value={Math.round(r.overall)} readOnly size={14} showValue /> },
-    { key: 'status',  label: 'Status',  render: (r) => <Badge tone={r.status === 'approved' ? 'success' : 'warning'} className="capitalize">{r.status}</Badge> },
-    { key: 'commentPreview', label: 'Comment', render: (r) => <p className="text-xs text-muted line-clamp-2 max-w-xs">{r.commentPreview}</p> },
+    {
+      key: 'name',
+      label: 'Student',
+      render: (r) => (
+        <div className="flex items-center gap-2">
+          <Avatar name={r.name} size={28} />
+          <div><p className="font-medium text-fg">{r.name}</p><p className="text-xs text-muted">{r.rollNumber}</p></div>
+        </div>
+      ),
+    },
   ];
 
   return (
     <PageContainer>
-      <PageHeader title="My Rating History" subtitle="Every rating you've submitted, kept anonymous to others." icon={<History size={18} />} />
+      <PageHeader
+        title="Students You've Rated"
+        subtitle="Ratings are anonymous by design — the score and comment you gave are never linked back to you, so only the list of who you've rated is available here."
+        icon={<History size={18} />}
+      />
       <Mission7SubNav />
 
       <div className="flex flex-wrap gap-3 items-end mb-4">
         <div className="flex-1 min-w-[220px]">
           <SearchInput value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} placeholder="Search by name or roll..." />
         </div>
-        <Select label="Status" value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }} className="min-w-[140px]">
-          <option value="">All</option>
-          <option value="approved">Approved</option>
-          <option value="pending">Pending</option>
-        </Select>
       </div>
 
-      {items.length === 0 ? (
+      {loading ? (
+        <LoadingState label="Loading rating history..." />
+      ) : error ? (
+        <ErrorState title="Couldn't load rating history" message={error} />
+      ) : items.length === 0 ? (
         <EmptyState title="No ratings yet" message="Submit your first peer rating to see it here." />
       ) : (
         <>
@@ -64,23 +81,19 @@ export default function RatingHistory() {
           </div>
           <div className="sm:hidden space-y-3">
             {items.map((r) => (
-              <Card key={r.id} className="p-4">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <p className="text-sm font-medium text-fg">{r.studentName}</p>
-                    <p className="text-xs text-muted">{r.roll} · {new Date(r.date).toLocaleDateString()}</p>
-                  </div>
-                  <Badge tone={r.status === 'approved' ? 'success' : 'warning'} className="capitalize">{r.status}</Badge>
+              <Card key={r.id} className="p-4 flex items-center gap-3">
+                <Avatar name={r.name} size={36} />
+                <div>
+                  <p className="text-sm font-medium text-fg">{r.name}</p>
+                  <p className="text-xs text-muted">{r.rollNumber}</p>
                 </div>
-                <div className="mt-2"><StarRating value={Math.round(r.overall)} readOnly size={14} showValue /></div>
-                <p className="mt-2 text-xs text-muted line-clamp-2">{r.commentPreview}</p>
               </Card>
             ))}
           </div>
         </>
       )}
 
-      {filtered.length > PAGE_SIZE && (
+      {!loading && !error && filtered.length > PAGE_SIZE && (
         <div className="mt-6 flex justify-center">
           <Pagination page={page} total={totalPages} onChange={setPage} />
         </div>

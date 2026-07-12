@@ -26,22 +26,6 @@ async function listRounds() {
   return prisma.candidateRound.findMany({ orderBy: { createdAt: 'desc' } });
 }
 
-async function getRoster(requesterId) {
-  return prisma.user.findMany({
-    where: { role: 'STUDENT', id: { not: requesterId } },
-    select: { id: true, name: true, rollNumber: true, class: true, section: true, isCaptain: true },
-    orderBy: [{ class: 'asc' }, { section: 'asc' }, { name: 'asc' }],
-  });
-}
-
-async function getCaptainRoster() {
-  return prisma.user.findMany({
-    where: { role: 'STUDENT', isCaptain: true },
-    select: { id: true, name: true, rollNumber: true, class: true, section: true, isCaptain: true },
-    orderBy: [{ class: 'asc' }, { section: 'asc' }, { name: 'asc' }],
-  });
-}
-
 async function getRound(id) {
   const round = await prisma.candidateRound.findUnique({ where: { id } });
   if (!round) throw new AppError('Round not found', 404);
@@ -147,8 +131,53 @@ async function getCandidateAnalytics(roundId) {
   };
 }
 
+async function getRoster({ class: cls, section, q } = {}) {
+  const where = { role: 'STUDENT' };
+  if (cls) where.class = parseInt(cls, 10);
+  if (section) where.section = section;
+  if (q) {
+    where.OR = [
+      { name: { contains: q, mode: 'insensitive' } },
+      { rollNumber: { contains: q, mode: 'insensitive' } },
+    ];
+  }
+  return prisma.user.findMany({
+    where,
+    select: { id: true, name: true, rollNumber: true, class: true, section: true, isCaptain: true },
+    orderBy: [{ class: 'asc' }, { section: 'asc' }, { name: 'asc' }],
+  });
+}
+
+async function setCaptain(studentId, isCaptain) {
+  const student = await prisma.user.findUnique({ where: { id: studentId } });
+  if (!student) throw new AppError('Student not found', 404);
+
+  if (isCaptain) {
+    // Enforce one captain per class+section — demote any existing captain there first.
+    await prisma.user.updateMany({
+      where: { role: 'STUDENT', class: student.class, section: student.section, isCaptain: true, id: { not: studentId } },
+      data: { isCaptain: false },
+    });
+  }
+
+  return prisma.user.update({
+    where: { id: studentId },
+    data: { isCaptain },
+    select: { id: true, name: true, rollNumber: true, class: true, section: true, isCaptain: true },
+  });
+}
+
+async function getCaptains() {
+  return prisma.user.findMany({
+    where: { role: 'STUDENT', isCaptain: true },
+    select: { id: true, name: true, rollNumber: true, class: true, section: true },
+    orderBy: [{ class: 'asc' }, { section: 'asc' }],
+  });
+}
+
 module.exports = {
-  listRounds, getRoster, getCaptainRoster, getRound, updateWeights, createRound, getRankedCandidates,
+  listRounds, getRound, updateWeights, createRound, getRankedCandidates,
   getCandidateProfile, upsertCandidateProfile, compareCandidates,
   submitOverride, getRoundHistory, getCandidateAnalytics,
+  getRoster, setCaptain, getCaptains,
 };

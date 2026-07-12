@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { GitCompare, X, Plus } from 'lucide-react';
 import PageContainer from '../../components/layout/PageContainer.jsx';
@@ -11,33 +11,57 @@ import Avatar from '../../components/ui/Avatar.jsx';
 import Badge from '../../components/ui/Badge.jsx';
 import SectionHeader from '../../components/ui/SectionHeader.jsx';
 import EmptyState from '../../components/feedback/EmptyState.jsx';
-import RecommendationBadge from '../../components/mission8/RecommendationBadge.jsx';
-import { CANDIDATES, SCORE_WEIGHTS } from '../../mocks/data/mission8.js';
+import LoadingState from '../../components/feedback/Loading.jsx';
+import ErrorState from '../../components/feedback/ErrorState.jsx';
+import { getCurrentRound, getRankedCandidates, weightsToList } from '../../services/candidatesService.js';
+
 import { cx } from '../../utils/index.js';
 
 const COLORS = ['rgb(var(--brand))', 'rgb(var(--success))', 'rgb(var(--warning))', 'rgb(var(--danger))'];
 const MAX = 4;
 
 export default function CandidateCompare() {
-  const [ids, setIds] = useState(['cand-1', 'cand-2']);
+  const [candidates, setCandidates] = useState([]);
+  const [weights, setWeights] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [ids, setIds] = useState([]);
   const [pick, setPick] = useState('');
 
-  const selected = ids.map((id) => CANDIDATES.find((c) => c.id === id)).filter(Boolean);
+  useEffect(() => {
+    let active = true;
+    getCurrentRound()
+      .then((round) => {
+        if (!active || !round) return [];
+        setWeights(weightsToList(round.weights));
+        return getRankedCandidates(round.id);
+      })
+      .then((data) => {
+        if (!active) return;
+        setCandidates(data || []);
+        setIds((data || []).slice(0, 2).map((c) => c.id));
+      })
+      .catch((err) => { if (active) setError(err?.message || 'Unable to load candidates'); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, []);
 
-  const radar = useMemo(() => SCORE_WEIGHTS.map((w) => {
+  const selected = ids.map((id) => candidates.find((c) => c.id === id)).filter(Boolean);
+
+  const radar = useMemo(() => weights.map((w) => {
     const row = { subject: w.label };
-    selected.forEach((s) => { row[s.name] = s.scores[w.key]; });
+    selected.forEach((s) => { row[s.name] = s.scores?.[w.key] ?? 0; });
     return row;
-  }), [selected]);
+  }), [selected, weights]);
 
   const bestByKey = useMemo(() => {
     const map = {};
-    SCORE_WEIGHTS.forEach((w) => {
-      const best = selected.reduce((b, s) => (!b || s.scores[w.key] > b.scores[w.key] ? s : b), null);
+    weights.forEach((w) => {
+      const best = selected.reduce((b, s) => (!b || (s.scores?.[w.key] ?? 0) > (b.scores?.[w.key] ?? 0) ? s : b), null);
       map[w.key] = best?.id;
     });
     return map;
-  }, [selected]);
+  }, [selected, weights]);
 
   const remove = (id) => setIds((xs) => xs.filter((x) => x !== id));
   const add = () => {
@@ -46,6 +70,26 @@ export default function CandidateCompare() {
       setPick('');
     }
   };
+
+  if (loading) {
+    return (
+      <PageContainer>
+        <PageHeader title="Compare Candidates" subtitle="Line up 2–4 candidates across every leadership factor." icon={<GitCompare size={18} />} />
+        <Mission8SubNav />
+        <LoadingState label="Loading candidates..." />
+      </PageContainer>
+    );
+  }
+
+  if (error) {
+    return (
+      <PageContainer>
+        <PageHeader title="Compare Candidates" subtitle="Line up 2–4 candidates across every leadership factor." icon={<GitCompare size={18} />} />
+        <Mission8SubNav />
+        <ErrorState title="Couldn't load candidates" message={error} />
+      </PageContainer>
+    );
+  }
 
   return (
     <PageContainer>
@@ -56,7 +100,7 @@ export default function CandidateCompare() {
         <div className="flex-1 min-w-[220px]">
           <Select label="Add candidate" value={pick} onChange={(e) => setPick(e.target.value)}>
             <option value="">— Select —</option>
-            {CANDIDATES.filter((c) => !ids.includes(c.id)).map((c) => (
+            {candidates.filter((c) => !ids.includes(c.id)).map((c) => (
               <option key={c.id} value={c.id}>{c.name} ({c.roll})</option>
             ))}
           </Select>
@@ -84,15 +128,15 @@ export default function CandidateCompare() {
                   <Avatar name={s.name} size={40} />
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-fg truncate">{s.name}</p>
-                    <p className="text-xs text-muted truncate">{s.roll} · {s.department}</p>
+                    <p className="text-xs text-muted truncate">{s.roll}</p>
                   </div>
                 </div>
                 <div className="mt-3 flex items-center justify-between">
                   <div>
-                    <p className="text-2xl font-semibold text-fg tabular-nums">{s.scores.overall}</p>
+                    <p className="text-2xl font-semibold text-fg tabular-nums">{s.scores?.overall ?? 0}</p>
                     <p className="text-[11px] text-muted">Overall</p>
                   </div>
-                  <RecommendationBadge status={s.status} />
+                  {s.badge && <Badge tone="brand">{s.badge}</Badge>}
                 </div>
               </Card>
             ))}
@@ -130,14 +174,14 @@ export default function CandidateCompare() {
                 </tr>
               </thead>
               <tbody>
-                {SCORE_WEIGHTS.map((w) => (
+                {weights.map((w) => (
                   <tr key={w.key} className="border-t border-border">
                     <td className="px-3 py-2.5 text-fg">{w.label}</td>
                     {selected.map((s) => {
                       const best = bestByKey[w.key] === s.id;
                       return (
                         <td key={s.id} className={cx('px-3 py-2.5 tabular-nums', best ? 'text-success font-semibold' : 'text-fg')}>
-                          {s.scores[w.key]}{best && <Badge tone="success" className="ml-1.5">Top</Badge>}
+                          {s.scores?.[w.key] ?? 0}{best && <Badge tone="success" className="ml-1.5">Top</Badge>}
                         </td>
                       );
                     })}
@@ -146,11 +190,11 @@ export default function CandidateCompare() {
                 <tr className="border-t border-border bg-elevated/40">
                   <td className="px-3 py-2.5 font-semibold text-fg">Overall</td>
                   {selected.map((s) => {
-                    const top = Math.max(...selected.map((x) => x.scores.overall));
-                    const best = s.scores.overall === top;
+                    const top = Math.max(...selected.map((x) => x.scores?.overall ?? 0));
+                    const best = (s.scores?.overall ?? 0) === top;
                     return (
                       <td key={s.id} className={cx('px-3 py-2.5 tabular-nums font-semibold', best ? 'text-brand' : 'text-fg')}>
-                        {s.scores.overall}
+                        {s.scores?.overall ?? 0}
                       </td>
                     );
                   })}

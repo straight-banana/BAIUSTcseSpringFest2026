@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Users, LayoutGrid, List } from 'lucide-react';
 import PageContainer from '../../components/layout/PageContainer.jsx';
 import PageHeader from '../../components/layout/PageHeader.jsx';
@@ -9,24 +9,47 @@ import Select from '../../components/forms/Select.jsx';
 import Pagination from '../../components/ui/Pagination.jsx';
 import Button from '../../components/common/Button.jsx';
 import EmptyState from '../../components/feedback/EmptyState.jsx';
-import { STUDENTS } from '../../mocks/data/mission7.js';
+import LoadingState from '../../components/feedback/Loading.jsx';
+import ErrorState from '../../components/feedback/ErrorState.jsx';
+import { getRoster, getLeaderboard } from '../../services/ratingsService.js';
 import { cx } from '../../utils/index.js';
 
 const PAGE_SIZE = 8;
 
 export default function StudentList() {
+  const [students, setStudents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [q, setQ] = useState('');
   const [section, setSection] = useState('');
   const [sort, setSort] = useState('overall-desc');
   const [view, setView] = useState('grid');
   const [page, setPage] = useState(1);
 
+  useEffect(() => {
+    let active = true;
+    Promise.all([getRoster(), getLeaderboard()])
+      .then(([roster, board]) => {
+        if (!active) return;
+        const overallById = new Map(board.map((b) => [b.id, b.overall]));
+        setStudents(roster.map((s) => ({ ...s, overall: overallById.get(s.id) ?? 0 })));
+      })
+      .catch((err) => {
+        if (!active) return;
+        setError(err?.message || 'Unable to load students');
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => { active = false; };
+  }, []);
+
   const filtered = useMemo(() => {
-    let list = STUDENTS.filter((s) => {
+    let list = students.filter((s) => {
       if (section && s.section !== section) return false;
       if (q) {
         const t = q.toLowerCase();
-        return s.name.toLowerCase().includes(t) || s.roll.includes(t);
+        return s.name.toLowerCase().includes(t) || (s.roll || '').includes(t);
       }
       return true;
     });
@@ -39,7 +62,7 @@ export default function StudentList() {
       return 0;
     });
     return list;
-  }, [q, section, sort]);
+  }, [students, q, section, sort]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const pageItems = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -75,7 +98,11 @@ export default function StudentList() {
         </div>
       </div>
 
-      {pageItems.length === 0 ? (
+      {loading ? (
+        <LoadingState label="Loading students..." />
+      ) : error ? (
+        <ErrorState title="Couldn't load students" message={error} />
+      ) : pageItems.length === 0 ? (
         <EmptyState title="No students match your filters" message="Try clearing the search or section." />
       ) : (
         <div className={cx(view === 'grid'
@@ -88,7 +115,7 @@ export default function StudentList() {
         </div>
       )}
 
-      {filtered.length > PAGE_SIZE && (
+      {!loading && !error && filtered.length > PAGE_SIZE && (
         <div className="mt-6 flex justify-center">
           <Pagination page={page} total={totalPages} onChange={setPage} />
         </div>

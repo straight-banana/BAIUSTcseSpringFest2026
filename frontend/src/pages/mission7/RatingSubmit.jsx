@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Star, Send, RotateCcw, ShieldCheck } from 'lucide-react';
 import PageContainer from '../../components/layout/PageContainer.jsx';
@@ -12,7 +12,7 @@ import CategoryRatingCard from '../../components/mission7/CategoryRatingCard.jsx
 import AnonymousBadge from '../../components/mission7/AnonymousBadge.jsx';
 import Avatar from '../../components/ui/Avatar.jsx';
 import { useToast } from '../../components/feedback/Toast.jsx';
-import { RATING_CATEGORIES, STUDENTS, getStudentById } from '../../mocks/data/mission7.js';
+import { RATING_CATEGORIES, getRoster, submitRating } from '../../services/ratingsService.js';
 
 const MAX_COMMENT = 500;
 const initialRatings = () => Object.fromEntries(RATING_CATEGORIES.map((c) => [c.key, 0]));
@@ -21,14 +21,25 @@ export default function RatingSubmit() {
   const [params] = useSearchParams();
   const nav = useNavigate();
   const { push } = useToast();
+  const [roster, setRoster] = useState([]);
+  const [rosterError, setRosterError] = useState('');
   const [studentId, setStudentId] = useState(params.get('student') || '');
   const [ratings, setRatings] = useState(initialRatings);
   const [comment, setComment] = useState('');
   const [strengths, setStrengths] = useState('');
   const [improvements, setImprovements] = useState('');
   const [touched, setTouched] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
-  const student = studentId ? getStudentById(studentId) : null;
+  useEffect(() => {
+    let active = true;
+    getRoster()
+      .then((data) => { if (active) setRoster(Array.isArray(data) ? data : []); })
+      .catch((err) => { if (active) setRosterError(err?.message || 'Unable to load classmates'); });
+    return () => { active = false; };
+  }, []);
+
+  const student = studentId ? roster.find((s) => s.id === studentId) : null;
   const missing = useMemo(() => {
     const errs = {};
     if (!studentId) errs.student = 'Select a student';
@@ -43,15 +54,29 @@ export default function RatingSubmit() {
     setComment(''); setStrengths(''); setImprovements(''); setTouched(false);
   };
 
-  const submit = (e) => {
+  const submit = async (e) => {
     e.preventDefault();
     setTouched(true);
     if (Object.keys(missing).length) {
       push({ tone: 'error', title: 'Please complete the form', message: Object.values(missing)[0] });
       return;
     }
-    push({ tone: 'success', title: 'Rating submitted', message: 'Your anonymous rating has been recorded.' });
-    setTimeout(() => nav('/mission-7/history'), 500);
+    const fullComment = [
+      comment,
+      strengths && `Strengths: ${strengths}`,
+      improvements && `Suggestions: ${improvements}`,
+    ].filter(Boolean).join('\n\n');
+
+    setSubmitting(true);
+    try {
+      await submitRating(studentId, { scores: ratings, comment: fullComment || undefined });
+      push({ tone: 'success', title: 'Rating submitted', message: 'Your anonymous rating has been recorded.' });
+      setTimeout(() => nav('/mission-7/history'), 500);
+    } catch (err) {
+      push({ tone: 'error', title: 'Submission failed', message: err?.message || 'Please try again.' });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -78,10 +103,11 @@ export default function RatingSubmit() {
               error={touched && missing.student}
             >
               <option value="">— Choose a classmate —</option>
-              {STUDENTS.map((s) => (
+              {roster.map((s) => (
                 <option key={s.id} value={s.id}>{s.name} ({s.roll})</option>
               ))}
             </Select>
+            {rosterError && <p className="mt-2 text-xs text-danger">{rosterError}</p>}
             {student && (
               <div className="mt-3 flex items-center gap-3 rounded-md border border-border bg-elevated p-3">
                 <Avatar name={student.name} size={36} />
@@ -135,8 +161,8 @@ export default function RatingSubmit() {
           </Card>
 
           <div className="flex flex-wrap gap-2 justify-end">
-            <Button type="button" variant="outline" leftIcon={<RotateCcw size={14} />} onClick={reset}>Reset</Button>
-            <Button type="submit" leftIcon={<Send size={14} />}>Submit Rating</Button>
+            <Button type="button" variant="outline" leftIcon={<RotateCcw size={14} />} onClick={reset} disabled={submitting}>Reset</Button>
+            <Button type="submit" leftIcon={<Send size={14} />} disabled={submitting}>{submitting ? 'Submitting…' : 'Submit Rating'}</Button>
           </div>
         </div>
 

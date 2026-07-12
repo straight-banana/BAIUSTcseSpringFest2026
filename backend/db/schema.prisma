@@ -164,7 +164,6 @@ model Complaint {
   anonymous         Boolean         @default(true)
   encryptedIdentity String?         // AES-256 encrypted, only if anonymous=false
   imageUrl          String?
-  metadata          Json?
   referenceCode     String          @unique @default(uuid())
   // Status & history
   status            ComplaintStatus @default(PENDING)

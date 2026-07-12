@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useMemo, useState, useCallback } from 'react';
 import PageContainer from '../../components/layout/PageContainer.jsx';
 import PageHeader from '../../components/layout/PageHeader.jsx';
 import Mission1SubNav from '../../components/mission1/Mission1SubNav.jsx';
@@ -14,11 +14,10 @@ import ComplaintCard from '../../components/mission1/ComplaintCard.jsx';
 import ModerationModal from '../../components/mission1/ModerationModal.jsx';
 import Pagination from '../../components/ui/Pagination.jsx';
 import EmptyState from '../../components/feedback/EmptyState.jsx';
-import { CATEGORIES, STATUSES } from '../../mocks/data/complaints.js';
+import { CATEGORIES, STATUSES, complaints as seedComplaints } from '../../mocks/data/complaints.js';
 import { History, Eye, ArrowUpDown, Gavel } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useToast } from '../../components/feedback/Toast.jsx';
-import { listComplaints } from '../../services/complaintsService.js';
 
 const PAGE_SIZE = 8;
 
@@ -37,36 +36,13 @@ export default function ComplaintHistory() {
   const { role } = useAuth();
   const toast = useToast();
   const isReviewer = role === 'teacher' || role === 'office';
-  const [rows, setRows] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [rows, setRows] = useState(seedComplaints);
   const [q, setQ] = useState('');
   const [cat, setCat] = useState('');
   const [status, setStatus] = useState('');
   const [sort, setSort] = useState('newest');
   const [page, setPage] = useState(1);
   const [reviewing, setReviewing] = useState(null);
-
-  useEffect(() => {
-    let alive = true;
-    setLoading(true);
-    setError(null);
-
-    listComplaints()
-      .then((result) => {
-        if (!alive) return;
-        setRows(result.complaints || []);
-      })
-      .catch((err) => {
-        if (!alive) return;
-        setError(err?.message || 'Failed to load complaints');
-      })
-      .finally(() => {
-        if (alive) setLoading(false);
-      });
-
-    return () => { alive = false; };
-  }, []);
 
   const filtered = useMemo(() => {
     let out = rows.filter((c) => {
@@ -163,11 +139,7 @@ export default function ComplaintHistory() {
         </div>
       </Card>
 
-      {loading ? (
-        <EmptyState title="Loading complaints" message="Fetching reports from the server..." />
-      ) : error ? (
-        <EmptyState title="Unable to load complaints" message={error} />
-      ) : filtered.length === 0 ? (
+      {filtered.length === 0 ? (
         <EmptyState title="No complaints found" message="Try adjusting your search or filters." />
       ) : (
         <>

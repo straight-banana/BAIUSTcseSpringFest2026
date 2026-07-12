@@ -1,39 +1,11 @@
 'use strict';
 
 const candidateService = require('../services/candidateService');
-const authService = require('../services/authService');
 
 async function listRounds(req, res, next) {
   try {
     const rounds = await candidateService.listRounds();
     res.json({ status: 'success', data: rounds });
-  } catch (error) {
-    next(error);
-  }
-}
-
-async function getRoster(req, res, next) {
-  try {
-    const roster = await candidateService.getRoster(req.user.id);
-    res.json({ status: 'success', data: roster });
-  } catch (error) {
-    next(error);
-  }
-}
-
-async function getStudentCaptainStatus(req, res, next) {
-  try {
-    const profile = await authService.getProfile(req.params.id);
-    res.json({ status: 'success', data: { id: profile.id, isCaptain: profile.isCaptain, section: profile.section, class: profile.class } });
-  } catch (error) {
-    next(error);
-  }
-}
-
-async function getCaptainRoster(req, res, next) {
-  try {
-    const roster = await candidateService.getCaptainRoster();
-    res.json({ status: 'success', data: roster });
   } catch (error) {
     next(error);
   }
@@ -131,8 +103,36 @@ async function getAnalytics(req, res, next) {
   }
 }
 
+async function getRoster(req, res, next) {
+  try {
+    const { class: cls, section, q } = req.query;
+    const roster = await candidateService.getRoster({ class: cls, section, q });
+    res.json({ status: 'success', data: roster });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function setCaptain(req, res, next) {
+  try {
+    const student = await candidateService.setCaptain(req.params.studentId, !!req.body.isCaptain);
+    res.json({ status: 'success', data: student });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function getCaptains(req, res, next) {
+  try {
+    const captains = await candidateService.getCaptains();
+    res.json({ status: 'success', data: captains });
+  } catch (error) {
+    next(error);
+  }
+}
+
 module.exports = {
-  getRoster, getStudentCaptainStatus, getCaptainRoster,
   listRounds, getRound, updateWeights, createRound, getRankedCandidates,
   getProfile, upsertProfile, compare, submitOverride, getHistory, getAnalytics,
+  getRoster, setCaptain, getCaptains,
 };

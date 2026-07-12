@@ -1,14 +1,13 @@
 'use strict';
 
 const sosService = require('../services/sosService');
-const { successResponse } = require('../utils/apiResponse');
 
 async function triggerAlert(req, res, next) {
   try {
     const data = { ...req.body, reportedById: req.user ? req.user.id : null };
     const io = req.app.get('io');
     const alert = await sosService.triggerSos(data, io);
-    res.status(201).json(successResponse(alert));
+    res.status(201).json({ status: 'success', data: alert });
   } catch (error) {
     next(error);
   }
@@ -17,7 +16,7 @@ async function triggerAlert(req, res, next) {
 async function getActiveAlerts(req, res, next) {
   try {
     const alerts = await sosService.getActiveAlerts();
-    res.json(successResponse(alerts));
+    res.json({ status: 'success', data: alerts });
   } catch (error) {
     next(error);
   }
@@ -31,7 +30,7 @@ async function listAlerts(req, res, next) {
       limit: parseInt(limit) || 20,
       status, location
     });
-    res.json(successResponse(result));
+    res.json({ status: 'success', data: result });
   } catch (error) {
     next(error);
   }
@@ -41,7 +40,7 @@ async function claimAlert(req, res, next) {
   try {
     const io = req.app.get('io');
     const alert = await sosService.claimAlert(req.params.id, req.user.id, io);
-    res.json(successResponse(alert));
+    res.json({ status: 'success', data: alert });
   } catch (error) {
     next(error);
   }
@@ -51,7 +50,7 @@ async function resolveAlert(req, res, next) {
   try {
     const io = req.app.get('io');
     const alert = await sosService.resolveAlert(req.params.id, io);
-    res.json(successResponse(alert));
+    res.json({ status: 'success', data: alert });
   } catch (error) {
     next(error);
   }
@@ -60,7 +59,7 @@ async function resolveAlert(req, res, next) {
 async function getLocations(req, res, next) {
   try {
     const locations = sosService.getMapLocations();
-    res.json(successResponse(locations));
+    res.json({ status: 'success', data: locations });
   } catch (error) {
     next(error);
   }
@@ -69,7 +68,7 @@ async function getLocations(req, res, next) {
 async function getAnalytics(req, res, next) {
   try {
     const analytics = await sosService.getAnalytics();
-    res.json(successResponse(analytics));
+    res.json({ status: 'success', data: analytics });
   } catch (error) {
     next(error);
   }

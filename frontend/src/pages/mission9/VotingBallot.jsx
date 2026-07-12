@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Vote, ShieldCheck, ArrowLeft, X, Users, Info } from 'lucide-react';
 import PageContainer from '../../components/layout/PageContainer.jsx';
@@ -10,21 +10,49 @@ import Avatar from '../../components/ui/Avatar.jsx';
 import Badge from '../../components/ui/Badge.jsx';
 import SectionHeader from '../../components/ui/SectionHeader.jsx';
 import EmptyState from '../../components/feedback/EmptyState.jsx';
+import LoadingState from '../../components/feedback/Loading.jsx';
+import ErrorState from '../../components/feedback/ErrorState.jsx';
 import Mission9SubNav from '../../components/mission9/Mission9SubNav.jsx';
 import CandidateVoteCard from '../../components/mission9/CandidateVoteCard.jsx';
 import CountdownTimer from '../../components/mission9/CountdownTimer.jsx';
-import { CANDIDATES, ELECTION, getCandidateById, makeVoteRef } from '../../mocks/data/mission9.js';
+import { getActive, hasVoted, castVote } from '../../services/electionsService.js';
 
 export default function VotingBallot() {
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
   const initial = params.get('candidate') || '';
+  const [election, setElection] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [selectedId, setSelectedId] = useState(initial);
   const [confirmed, setConfirmed] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [showPicker, setShowPicker] = useState(!initial);
+  const [submitting, setSubmitting] = useState(false);
 
-  const candidate = useMemo(() => selectedId ? getCandidateById(selectedId) : null, [selectedId]);
+  useEffect(() => {
+    let active = true;
+    getActive()
+      .then((e) => {
+        if (!active) return null;
+        setElection(e);
+        return e ? hasVoted(e.id) : null;
+      })
+      .then((v) => {
+        if (!active) return;
+        if (v?.hasVoted) setError('You have already voted in this election.');
+      })
+      .catch((err) => {
+        if (!active) return;
+        if (err?.status === 404) setError('There is no active election right now.');
+        else setError(err?.message || 'Unable to load election');
+      })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, []);
+
+  const candidates = election?.candidates || [];
+  const candidate = useMemo(() => candidates.find((c) => c.id === selectedId) || null, [candidates, selectedId]);
 
   const pick = (id) => {
     setSelectedId(id);
@@ -32,17 +60,45 @@ export default function VotingBallot() {
     setParams({ candidate: id }, { replace: true });
   };
 
-  const submit = () => {
-    const ref = makeVoteRef();
-    setShowModal(false);
-    navigate(`/mission-9/confirmation?ref=${ref}&candidate=${selectedId}`);
+  const submit = async () => {
+    setSubmitting(true);
+    try {
+      await castVote(election.id, [{ candidateId: selectedId, rank: 1 }]);
+      setShowModal(false);
+      navigate('/mission-9/confirmation', { state: { candidate, electionTitle: election.title } });
+    } catch (err) {
+      setShowModal(false);
+      setError(err?.message || 'Failed to submit vote');
+    } finally {
+      setSubmitting(false);
+    }
   };
+
+  if (loading) {
+    return (
+      <PageContainer>
+        <PageHeader title="Voting Ballot" icon={<Vote size={18} />} />
+        <Mission9SubNav />
+        <LoadingState label="Loading ballot..." />
+      </PageContainer>
+    );
+  }
+
+  if (error || !election) {
+    return (
+      <PageContainer>
+        <PageHeader title="Voting Ballot" icon={<Vote size={18} />} />
+        <Mission9SubNav />
+        <ErrorState title="Can't open ballot" message={error || 'No active election'} />
+      </PageContainer>
+    );
+  }
 
   return (
     <PageContainer>
       <PageHeader
         title="Voting Ballot"
-        subtitle={ELECTION.name}
+        subtitle={election.title}
         icon={<Vote size={18} />}
         actions={
           <Link to="/mission-9/candidates"><Button variant="outline" leftIcon={<ArrowLeft size={14} />}>Cancel</Button></Link>
@@ -56,7 +112,7 @@ export default function VotingBallot() {
             <Card className="p-5">
               <SectionHeader title="Choose your candidate" description="Tap a candidate to place them on the ballot" />
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {CANDIDATES.map((c) => (
+                {candidates.map((c) => (
                   <CandidateVoteCard
                     key={c.id}
                     candidate={c}
@@ -92,8 +148,8 @@ export default function VotingBallot() {
                 <Avatar name={candidate.name} size={56} />
                 <div className="min-w-0 flex-1">
                   <p className="text-base font-semibold text-fg truncate">{candidate.name}</p>
-                  <p className="text-xs text-muted truncate">{candidate.roll} · {candidate.department} · Sec {candidate.section}</p>
-                  <p className="mt-2 text-xs text-muted italic line-clamp-2">"{candidate.manifesto}"</p>
+                  <p className="text-xs text-muted truncate">{candidate.roll} · Sec {candidate.section}</p>
+                  {candidate.bio && <p className="mt-2 text-xs text-muted italic line-clamp-2">"{candidate.bio}"</p>}
                 </div>
                 <button
                   onClick={() => { setSelectedId(''); setConfirmed(false); setShowPicker(true); setParams({}, { replace: true }); }}
@@ -136,11 +192,13 @@ export default function VotingBallot() {
         </div>
 
         <aside className="space-y-4">
-          <CountdownTimer target={ELECTION.closes} />
+          {election.endsAt && <CountdownTimer target={election.endsAt} />}
           <Card className="p-4">
             <h4 className="text-xs uppercase text-subtle mb-2 inline-flex items-center gap-1.5"><ShieldCheck size={12} />Ballot rules</h4>
             <ul className="text-xs text-muted space-y-1.5 list-disc pl-4">
-              {ELECTION.rules.slice(0, 4).map((r, i) => <li key={i}>{r}</li>)}
+              <li>One student, one vote.</li>
+              <li>Voting is anonymous — your identity is not linked to your ballot.</li>
+              <li>Once submitted, your vote cannot be changed.</li>
             </ul>
           </Card>
           <Card className="p-4 bg-warning/10 border-warning/30">
@@ -161,8 +219,8 @@ export default function VotingBallot() {
         title="Confirm your vote"
         footer={
           <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setShowModal(false)}>Cancel</Button>
-            <Button onClick={submit} leftIcon={<Vote size={14} />}>Submit Vote</Button>
+            <Button variant="outline" onClick={() => setShowModal(false)} disabled={submitting}>Cancel</Button>
+            <Button onClick={submit} leftIcon={<Vote size={14} />} disabled={submitting}>{submitting ? 'Submitting…' : 'Submit Vote'}</Button>
           </div>
         }
       >
@@ -173,7 +231,7 @@ export default function VotingBallot() {
               <Avatar name={candidate.name} size={40} />
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-fg truncate">{candidate.name}</p>
-                <p className="text-xs text-muted truncate">{candidate.roll} · {candidate.department}</p>
+                <p className="text-xs text-muted truncate">{candidate.roll}</p>
               </div>
               <Badge tone="brand" className="ml-auto">Selected</Badge>
             </div>

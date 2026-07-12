@@ -16,65 +16,12 @@ const MAP_LOCATIONS = [
   { id: 'OTHER',     name: 'Other',      lat: 23.8103, lng: 90.4125, icon: '📍' },
 ];
 
-const LOCATION_MAP = {
-  classroom: 'CLASSROOM',
-  library: 'LIBRARY',
-  playground: 'PLAYGROUND',
-  corridor: 'CORRIDOR',
-  canteen: 'CANTEEN',
-  office: 'OFFICE',
-  restroom: 'RESTROOM',
-  laboratory: 'OTHER',
-  auditorium: 'OTHER',
-  other: 'OTHER',
-};
-
-const TYPE_MAP = {
-  bullying: 'BULLYING',
-  injury: 'MEDICAL',
-  medical: 'MEDICAL',
-  harass: 'BULLYING',
-  theft: 'THEFT',
-  fight: 'BULLYING',
-  lost: 'OTHER',
-  other: 'OTHER',
-};
-
-const SEVERITY_MAP = {
-  low: 'LOW',
-  medium: 'MEDIUM',
-  high: 'HIGH',
-  critical: 'CRITICAL',
-};
-
-function normalizeLocation(location) {
-  if (!location) return 'OTHER';
-  const key = String(location).toLowerCase();
-  return LOCATION_MAP[key] || String(location).toUpperCase();
-}
-
-function normalizeType(type) {
-  if (!type) return 'OTHER';
-  const key = String(type).toLowerCase();
-  return TYPE_MAP[key] || 'OTHER';
-}
-
-function normalizeSeverity(severity) {
-  if (!severity) return 'MEDIUM';
-  const key = String(severity).toLowerCase();
-  return SEVERITY_MAP[key] || 'MEDIUM';
-}
-
 async function triggerSos({ location, type, severity, message, reportedById }, io) {
-  const normalizedLocation = normalizeLocation(location);
-  const normalizedType = normalizeType(type);
-  const normalizedSeverity = normalizeSeverity(severity);
-
   const alert = await prisma.sosAlert.create({
     data: {
-      location: normalizedLocation,
-      type: normalizedType,
-      severity: normalizedSeverity,
+      location: location || 'OTHER',
+      type: type || 'OTHER',
+      severity: severity || 'MEDIUM',
       message: message || null,
       reportedById: reportedById || null,
     },
@@ -91,9 +38,9 @@ async function triggerSos({ location, type, severity, message, reportedById }, i
     data: admins.map(a => ({
       userId: a.id,
       type: 'SOS_NEW',
-      title: `🚨 New SOS Alert — ${normalizedLocation}`,
-      body: message || `Emergency at ${normalizedLocation}. Severity: ${normalizedSeverity}`,
-      metadata: { alertId: alert.id, location: normalizedLocation, severity: normalizedSeverity, type: normalizedType },
+      title: `🚨 New SOS Alert — ${location}`,
+      body: message || `Emergency at ${location}. Severity: ${severity || 'MEDIUM'}`,
+      metadata: { alertId: alert.id, location, severity },
     })),
   });
 

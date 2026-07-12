@@ -7,9 +7,7 @@ const auth = require('../middleware/auth');
 const router = express.Router();
 
 router.post('/', auth({ roles: ['ADMIN', 'CAPTAIN'] }), seatController.generatePlan);
-router.post('/plan', auth({ roles: ['ADMIN', 'CAPTAIN'] }), seatController.generatePlan);
 router.get('/latest', seatController.getLatestPlan);
-router.get('/all/plans', seatController.getAllPlans);
 router.get('/', seatController.getAllPlans);
 router.get('/:id', seatController.getPlan);
 router.delete('/:id', auth({ roles: ['ADMIN'] }), seatController.deletePlan);

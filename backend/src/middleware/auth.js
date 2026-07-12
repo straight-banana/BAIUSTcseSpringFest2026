@@ -1,6 +1,5 @@
 'use strict';
 
-const prisma = require('../config/prisma');
 const { verifyToken } = require('../utils/tokens');
 const { errorResponse } = require('../utils/apiResponse');
 const { blacklist } = require('./tokenBlacklist');
@@ -15,7 +14,7 @@ const { blacklist } = require('./tokenBlacklist');
 function auth(options = {}) {
   const { optional = false, roles = [] } = options;
 
-  return async (req, res, next) => {
+  return (req, res, next) => {
     const authHeader = req.headers['authorization'];
     
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -38,18 +37,6 @@ function auth(options = {}) {
 
     req.user = decoded;
     req.token = token;
-
-    const dbUser = await prisma.user.findUnique({
-      where: { id: req.user.id },
-      select: { id: true, role: true, isCaptain: true },
-    });
-
-    if (!dbUser) {
-      return res.status(401).json(errorResponse('User not found', 401));
-    }
-
-    const effectiveRole = dbUser.isCaptain ? 'CAPTAIN' : dbUser.role;
-    req.user = { ...req.user, dbRole: dbUser.role, isCaptain: dbUser.isCaptain, role: effectiveRole };
 
     if (roles.length > 0 && !roles.includes(req.user.role)) {
       return res.status(403).json(errorResponse(`Requires role: ${roles.join(' or ')}`, 403));

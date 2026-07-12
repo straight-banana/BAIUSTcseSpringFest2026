@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Users, LayoutGrid, List } from 'lucide-react';
 import PageContainer from '../../components/layout/PageContainer.jsx';
 import PageHeader from '../../components/layout/PageHeader.jsx';
@@ -7,44 +7,51 @@ import SearchInput from '../../components/forms/SearchInput.jsx';
 import Select from '../../components/forms/Select.jsx';
 import Pagination from '../../components/ui/Pagination.jsx';
 import EmptyState from '../../components/feedback/EmptyState.jsx';
+import LoadingState from '../../components/feedback/Loading.jsx';
+import ErrorState from '../../components/feedback/ErrorState.jsx';
 import Mission9SubNav from '../../components/mission9/Mission9SubNav.jsx';
 import CandidateVoteCard from '../../components/mission9/CandidateVoteCard.jsx';
-import { CANDIDATES } from '../../mocks/data/mission9.js';
+import { getActive } from '../../services/electionsService.js';
 import { cx } from '../../utils/index.js';
 
-const CLASSES = ['All', '6', '7', '8', '9', '10'];
-const SORTS = [
-  { value: 'overall',    label: 'Overall score' },
-  { value: 'leadership', label: 'Leadership' },
-  { value: 'peer',       label: 'Peer rating' },
-  { value: 'name',       label: 'Name (A–Z)' },
-];
 const PER_PAGE = 6;
 
 export default function CandidateGallery() {
+  const [candidates, setCandidates] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [q, setQ] = useState('');
   const [cls, setCls] = useState('All');
-  const [sort, setSort] = useState('overall');
+  const [sort, setSort] = useState('name');
   const [view, setView] = useState('grid');
   const [page, setPage] = useState(1);
 
+  useEffect(() => {
+    let active = true;
+    getActive()
+      .then((e) => { if (active) setCandidates(e?.candidates || []); })
+      .catch((err) => {
+        if (!active) return;
+        if (err?.status !== 404) setError(err?.message || 'Unable to load candidates');
+      })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, []);
+
+  const classes = useMemo(() => ['All', ...new Set(candidates.map((c) => c.className).filter((c) => c != null))], [candidates]);
+
   const filtered = useMemo(() => {
-    let arr = CANDIDATES.filter((c) => {
+    let arr = candidates.filter((c) => {
       if (cls !== 'All' && c.className !== cls) return false;
       if (q) {
         const s = q.toLowerCase();
-        return c.name.toLowerCase().includes(s) || c.roll.includes(s) || c.manifesto.toLowerCase().includes(s);
+        return c.name.toLowerCase().includes(s) || (c.roll || '').includes(s) || (c.manifesto || '').toLowerCase().includes(s);
       }
       return true;
     });
-    arr = [...arr].sort((a, b) => {
-      if (sort === 'name') return a.name.localeCompare(b.name);
-      if (sort === 'peer') return b.scores.peer - a.scores.peer;
-      if (sort === 'leadership') return b.scores.leadership - a.scores.leadership;
-      return b.overallScore - a.overallScore;
-    });
+    arr = [...arr].sort((a, b) => a.name.localeCompare(b.name));
     return arr;
-  }, [q, cls, sort]);
+  }, [candidates, q, cls, sort]);
 
   const pages = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
   const p = Math.min(page, pages);
@@ -57,13 +64,10 @@ export default function CandidateGallery() {
 
       <Card className="p-4 mb-6 grid grid-cols-1 sm:grid-cols-4 gap-3">
         <div className="sm:col-span-2">
-          <SearchInput value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} placeholder="Search name, roll, or manifesto…" />
+          <SearchInput value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} placeholder="Search name, roll, or bio…" />
         </div>
         <Select value={cls} onChange={(e) => { setCls(e.target.value); setPage(1); }}>
-          {CLASSES.map((d) => <option key={d} value={d}>{d === 'All' ? 'All classes' : `Class ${d}`}</option>)}
-        </Select>
-        <Select value={sort} onChange={(e) => setSort(e.target.value)}>
-          {SORTS.map((s) => <option key={s.value} value={s.value}>Sort · {s.label}</option>)}
+          {classes.map((d) => <option key={d} value={d}>{d === 'All' ? 'All classes' : `Class ${d}`}</option>)}
         </Select>
       </Card>
 
@@ -90,7 +94,11 @@ export default function CandidateGallery() {
         </div>
       </div>
 
-      {shown.length === 0 ? (
+      {loading ? (
+        <LoadingState label="Loading candidates..." />
+      ) : error ? (
+        <ErrorState title="Couldn't load candidates" message={error} />
+      ) : shown.length === 0 ? (
         <EmptyState title="No candidates match" message="Try clearing the filters or search." />
       ) : view === 'grid' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -102,7 +110,7 @@ export default function CandidateGallery() {
         </div>
       )}
 
-      {pages > 1 && (
+      {!loading && !error && pages > 1 && (
         <div className="mt-6 flex justify-center">
           <Pagination page={p} total={pages} onChange={setPage} />
         </div>

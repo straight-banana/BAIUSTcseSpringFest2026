@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import PageContainer from '../../components/layout/PageContainer.jsx';
 import PageHeader from '../../components/layout/PageHeader.jsx';
@@ -10,30 +9,12 @@ import { StatCard, FeatureCard } from '../../components/common/Cards.jsx';
 import ConstraintBadge from '../../components/mission2/ConstraintBadge.jsx';
 import { Grid3X3, Users, Sofa, LayoutGrid, Sparkles, Eye, Ear, ArrowUpToLine, Lock, Target, Plus, PlayCircle } from 'lucide-react';
 import { SUMMARY } from '../../mocks/data/mission2.js';
-import { listPlans } from '../../services/seatsService.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 
 export default function Mission2Overview() {
   const { role } = useAuth();
   const isCaptain = role === 'captain';
   const canEdit = role === 'teacher' || role === 'office';
-  const [planCount, setPlanCount] = useState(SUMMARY.generatedPlans);
-  const [plansLoaded, setPlansLoaded] = useState(false);
-
-  useEffect(() => {
-    let active = true;
-    listPlans()
-      .then((plans) => {
-        if (!active) return;
-        setPlanCount(Array.isArray(plans) ? plans.length : plans?.length ?? SUMMARY.generatedPlans);
-      })
-      .catch(() => {
-      })
-      .finally(() => {
-        if (active) setPlansLoaded(true);
-      });
-    return () => { active = false; };
-  }, []);
 
   return (
     <PageContainer>
@@ -56,7 +37,7 @@ export default function Mission2Overview() {
         <StatCard icon={<Users size={16} />} label="Total Students" value={SUMMARY.totalStudents} hint="Across all sections" />
         <StatCard icon={<LayoutGrid size={16} />} label="Classroom Capacity" value={SUMMARY.capacity} hint="Current layout 7×8" />
         <StatCard icon={<Sofa size={16} />} label="Empty Seats" value={SUMMARY.emptySeats} hint="Available to assign" />
-        <StatCard icon={<Sparkles size={16} />} label="Generated Plans" value={plansLoaded ? planCount : '...'} hint="Saved arrangements" trend={12.4} />
+        <StatCard icon={<Sparkles size={16} />} label="Generated Plans" value={SUMMARY.generatedPlans} hint="Saved arrangements" trend={12.4} />
         <StatCard icon={<Grid3X3 size={16} />} label="Utilization" value={`${Math.round((SUMMARY.totalStudents / SUMMARY.capacity) * 100)}%`} hint="Seats occupied" trend={4.1} />
       </div>
 

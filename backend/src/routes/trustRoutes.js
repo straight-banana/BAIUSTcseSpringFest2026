@@ -6,6 +6,7 @@ const auth = require('../middleware/auth');
 
 const router = express.Router();
 
+// Admin-wide aggregate views
 router.get('/dashboard', auth({ roles: ['ADMIN'] }), trustController.getDashboard);
 router.get('/flags', auth({ roles: ['ADMIN'] }), trustController.getAllFlags);
 

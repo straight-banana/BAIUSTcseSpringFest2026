@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Siren, History, ShieldAlert, Phone, HeartPulse } from 'lucide-react';
 import PageContainer from '../../components/layout/PageContainer.jsx';
@@ -10,51 +10,13 @@ import SosButton from '../../components/mission5/SosButton.jsx';
 import SosReportModal from '../../components/mission5/SosReportModal.jsx';
 import AlertCard from '../../components/mission5/AlertCard.jsx';
 import { CURRENT_STUDENT_HISTORY, EMERGENCY_TIPS } from '../../mocks/data/mission5.js';
-import { useToast } from '../../components/feedback/Toast.jsx';
-import { listActiveSos, triggerSos } from '../../services/sosService.js';
 
 export default function Mission5Landing() {
-  const toast = useToast();
   const [modal, setModal] = useState(false);
-  const [activeAlerts, setActiveAlerts] = useState([]);
-  const [loadingAlerts, setLoadingAlerts] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState('');
   const nav = useNavigate();
 
-  useEffect(() => {
-    let active = true;
-    listActiveSos()
-      .then((alerts) => {
-        if (!active) return;
-        setActiveAlerts(Array.isArray(alerts) ? alerts : []);
-      })
-      .catch(() => {
-        if (!active) return;
-        setActiveAlerts([]);
-      })
-      .finally(() => {
-        if (active) setLoadingAlerts(false);
-      });
-    return () => { active = false; };
-  }, []);
-
-  const onSubmit = async (payload) => {
-    setSubmitting(true);
-    setSubmitError('');
-    try {
-      const alert = await triggerSos({
-        ...payload,
-        message: payload.description || payload.note,
-      });
-      toast.push({ tone: 'success', title: 'SOS sent', message: 'Captains have been notified.' });
-      nav('/mission-5/success', { state: alert });
-    } catch (err) {
-      setSubmitError(err?.message || 'Failed to send SOS');
-      toast.push({ tone: 'error', title: 'SOS failed', message: err?.message || 'Please try again.' });
-    } finally {
-      setSubmitting(false);
-    }
+  const onSubmit = (payload) => {
+    nav('/mission-5/success', { state: payload });
   };
 
   return (
@@ -108,11 +70,11 @@ export default function Mission5Landing() {
           action={<Link to="/mission-5/history" className="text-xs text-brand hover:underline">View all</Link>}
         />
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {(activeAlerts.length > 0 ? activeAlerts.slice(0, 3) : CURRENT_STUDENT_HISTORY.slice(0, 3)).map((a) => <AlertCard key={a.id} alert={a} onClick={() => {}} />)}
+          {CURRENT_STUDENT_HISTORY.slice(0, 3).map((a) => <AlertCard key={a.id} alert={a} onClick={() => {}} />)}
         </div>
       </Card>
 
-      <SosReportModal open={modal} onClose={() => setModal(false)} onSubmit={onSubmit} isSubmitting={submitting} />
+      <SosReportModal open={modal} onClose={() => setModal(false)} onSubmit={onSubmit} />
     </PageContainer>
   );
 }

@@ -91,8 +91,13 @@ async function getLeaderboard() {
   const keys = ['leadership', 'communication', 'teamwork', 'punctuality', 'attitude'];
   const board = users.map(u => {
     const ratings = u.receivedRatings;
+    const breakdown = Object.fromEntries(keys.map(k => [k, 0]));
     let overall = 0;
     if (ratings.length > 0) {
+      keys.forEach(k => {
+        const vals = ratings.map(r => (r.scores[k] || 0));
+        breakdown[k] = parseFloat((vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(2));
+      });
       const sum = ratings.reduce((acc, r) => {
         keys.forEach(k => { acc += (r.scores[k] || 0); });
         return acc;
@@ -102,7 +107,7 @@ async function getLeaderboard() {
     return {
       id: u.id, name: u.name, rollNumber: u.rollNumber,
       class: u.class, section: u.section, isCaptain: u.isCaptain,
-      overall, ratingCount: ratings.length,
+      overall, ratingCount: ratings.length, breakdown,
     };
   });
 

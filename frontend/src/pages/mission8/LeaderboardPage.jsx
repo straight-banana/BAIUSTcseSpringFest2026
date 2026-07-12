@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Trophy, Award, Users, MessageSquare, Sparkles } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Trophy, Award, MessageSquare } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import PageContainer from '../../components/layout/PageContainer.jsx';
 import PageHeader from '../../components/layout/PageHeader.jsx';
@@ -7,22 +7,43 @@ import Mission8SubNav from '../../components/mission8/Mission8SubNav.jsx';
 import Card from '../../components/common/Card.jsx';
 import Avatar from '../../components/ui/Avatar.jsx';
 import Badge from '../../components/ui/Badge.jsx';
-import RecommendationBadge from '../../components/mission8/RecommendationBadge.jsx';
-import { LEADERBOARDS } from '../../mocks/data/mission8.js';
+import LoadingState from '../../components/feedback/Loading.jsx';
+import ErrorState from '../../components/feedback/ErrorState.jsx';
+import EmptyState from '../../components/feedback/EmptyState.jsx';
+import { getCurrentRound, getRankedCandidates } from '../../services/candidatesService.js';
+import { getLeaderboard } from '../../services/ratingsService.js';
 import { cx } from '../../utils/index.js';
 
 const TABS = [
-  { key: 'overall',        label: 'Overall',           icon: <Trophy size={14} />, metricLabel: 'Overall',       get: (s) => s.scores.overall },
-  { key: 'leadership',     label: 'Leadership',        icon: <Award size={14} />,  metricLabel: 'Leadership',    get: (s) => s.scores.leadership },
-  { key: 'peer',           label: 'Top Peer Rating',   icon: <MessageSquare size={14} />, metricLabel: 'Peer /5', get: (s) => s.peerRating.toFixed(2) },
-  { key: 'participation',  label: 'Participation',     icon: <Users size={14} />,  metricLabel: 'Participation', get: (s) => s.scores.participation },
-  { key: 'mostRecommended',label: 'Most Recommended',  icon: <Sparkles size={14} />, metricLabel: 'Overall',      get: (s) => s.scores.overall },
+  { key: 'overall',    label: 'Overall',         icon: <Trophy size={14} />,        metricLabel: 'Overall',  get: (s) => s.scores?.overall ?? 0 },
+  { key: 'leadership', label: 'Leadership',      icon: <Award size={14} />,          metricLabel: 'Leadership', get: (s) => s.scores?.leadership ?? 0 },
+  { key: 'peer',       label: 'Top Peer Rating', icon: <MessageSquare size={14} />,  metricLabel: 'Peer /5',  get: (s) => (s.peerRating ?? 0).toFixed(2) },
 ];
 
 export default function LeaderboardPage() {
+  const [candidates, setCandidates] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [tab, setTab] = useState('overall');
   const active = TABS.find((t) => t.key === tab);
-  const list = LEADERBOARDS[tab] || [];
+
+  useEffect(() => {
+    let alive = true;
+    Promise.all([getCurrentRound().then((round) => (round ? getRankedCandidates(round.id) : [])), getLeaderboard()])
+      .then(([ranked, board]) => {
+        if (!alive) return;
+        const overallById = new Map(board.map((b) => [b.id, { overall: b.overall, count: b.ratingCount }]));
+        setCandidates(ranked.map((c) => ({ ...c, peerRating: overallById.get(c.userId)?.overall ?? 0 })));
+      })
+      .catch((err) => { if (alive) setError(err?.message || 'Unable to load leaderboard'); })
+      .finally(() => { if (alive) setLoading(false); });
+    return () => { alive = false; };
+  }, []);
+
+  const list = useMemo(
+    () => [...candidates].sort((a, b) => active.get(b) - active.get(a)),
+    [candidates, active]
+  );
 
   return (
     <PageContainer>
@@ -44,19 +65,29 @@ export default function LeaderboardPage() {
         ))}
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
-        {list.slice(0, 3).map((c, i) => (
-          <div key={c.id} className={cx('transition-transform', i === 0 && 'sm:-translate-y-2')}>
-            <PodiumCard rank={i + 1} candidate={c} metric={active.get(c)} metricLabel={active.metricLabel} />
+      {loading ? (
+        <LoadingState label="Loading leaderboard..." />
+      ) : error ? (
+        <ErrorState title="Couldn't load leaderboard" message={error} />
+      ) : list.length === 0 ? (
+        <EmptyState title="No candidates yet" message="Once a candidate round is active, rankings will appear here." />
+      ) : (
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+            {list.slice(0, 3).map((c, i) => (
+              <div key={c.id} className={cx('transition-transform', i === 0 && 'sm:-translate-y-2')}>
+                <PodiumCard rank={i + 1} candidate={c} metric={active.get(c)} metricLabel={active.metricLabel} />
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
 
-      <div className="space-y-2">
-        {list.slice(3).map((c, i) => (
-          <RowCard key={c.id} rank={i + 4} candidate={c} metric={active.get(c)} metricLabel={active.metricLabel} />
-        ))}
-      </div>
+          <div className="space-y-2">
+            {list.slice(3).map((c, i) => (
+              <RowCard key={c.id} rank={i + 4} candidate={c} metric={active.get(c)} metricLabel={active.metricLabel} />
+            ))}
+          </div>
+        </>
+      )}
     </PageContainer>
   );
 }
@@ -77,14 +108,16 @@ function PodiumCard({ rank, candidate, metric, metricLabel }) {
       <Link to={`/mission-8/candidates/${candidate.id}`} className="mt-2 block text-sm font-semibold text-fg hover:text-brand">
         {candidate.name}
       </Link>
-      <p className="text-[11px] text-muted">{candidate.roll} · {candidate.department}</p>
+      <p className="text-[11px] text-muted">{candidate.roll}</p>
       <div className="mt-3">
         <p className="text-2xl font-semibold text-fg tabular-nums">{metric}</p>
         <p className="text-[10px] uppercase text-subtle">{metricLabel}</p>
       </div>
-      <div className="mt-3">
-        <RecommendationBadge status={candidate.status} />
-      </div>
+      {candidate.badge && (
+        <div className="mt-3">
+          <Badge tone="brand">{candidate.badge}</Badge>
+        </div>
+      )}
     </Card>
   );
 }
@@ -100,9 +133,9 @@ function RowCard({ rank, candidate, metric, metricLabel }) {
         <Link to={`/mission-8/candidates/${candidate.id}`} className="text-sm font-semibold text-fg truncate hover:text-brand">
           {candidate.name}
         </Link>
-        <p className="text-[11px] text-muted truncate">{candidate.roll} · {candidate.department}</p>
+        <p className="text-[11px] text-muted truncate">{candidate.roll}</p>
       </div>
-      <Badge tone="neutral" className="hidden sm:inline-flex">{candidate.badge}</Badge>
+      {candidate.badge && <Badge tone="neutral" className="hidden sm:inline-flex">{candidate.badge}</Badge>}
       <div className="text-right shrink-0">
         <p className="text-sm font-semibold text-fg tabular-nums">{metric}</p>
         <p className="text-[10px] uppercase text-subtle">{metricLabel}</p>

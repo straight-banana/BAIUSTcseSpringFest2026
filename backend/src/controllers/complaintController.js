@@ -4,26 +4,12 @@ const complaintService = require('../services/complaintService');
 
 async function createComplaint(req, res, next) {
   try {
-    const {
-      category, description, anonymous, subject, course, courseCode,
-      teacher, classroom, incidentDate, incidentTime,
-    } = req.body;
-    const complaint = await complaintService.createComplaint({
-      category,
-      description,
-      anonymous,
+    const data = {
+      ...req.body,
       reportedById: req.user ? req.user.id : null,
-      imageFile: req.file || null,
-      metadata: {
-        subject,
-        course,
-        courseCode,
-        teacher,
-        classroom,
-        incidentDate,
-        incidentTime,
-      },
-    });
+      imageFile: req.file ? req.file : null,
+    };
+    const complaint = await complaintService.createComplaint(data);
     res.status(201).json({ status: 'success', data: complaint });
   } catch (error) {
     next(error);
@@ -40,20 +26,13 @@ async function uploadImage(req, res, next) {
   }
 }
 
-async function uploadComplaintImage(req, res, next) {
-  return uploadImage(req, res, next);
-}
-
 async function listComplaints(req, res, next) {
   try {
     const { page, limit, status, category } = req.query;
     const result = await complaintService.listComplaints({
       page: parseInt(page) || 1,
       limit: parseInt(limit) || 10,
-      status,
-      category,
-      userRole: req.user?.role,
-      userId: req.user?.id,
+      status, category
     });
     res.json({ status: 'success', data: result });
   } catch (error) {
@@ -136,6 +115,6 @@ async function deleteComplaint(req, res, next) {
 
 module.exports = {
   createComplaint, uploadImage, listComplaints, getComplaint,
-  uploadComplaintImage, getHistory, updateStatus, addWarning, getStrikes, getMyComplaints,
+  getHistory, updateStatus, addWarning, getStrikes, getMyComplaints,
   getDashboard, deleteComplaint,
 };

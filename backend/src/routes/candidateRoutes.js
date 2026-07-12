@@ -6,15 +6,10 @@ const auth = require('../middleware/auth');
 
 const router = express.Router();
 
-router.get('/roster', auth({ roles: ['ADMIN', 'CAPTAIN'] }), candidateController.getRoster);
-router.get('/roster/:id/captain', auth({ roles: ['ADMIN'] }), candidateController.getStudentCaptainStatus);
-router.get('/captains', auth({ roles: ['ADMIN'] }), candidateController.getCaptainRoster);
-
-router.get('/recommendations/rounds', auth({ roles: ['ADMIN', 'CAPTAIN'] }), candidateController.listRounds);
-router.get('/recommendations/rounds/:id', auth({ roles: ['ADMIN', 'CAPTAIN'] }), candidateController.getRound);
-router.get('/recommendations/rounds/:id/candidates', auth({ roles: ['ADMIN', 'CAPTAIN'] }), candidateController.getRankedCandidates);
-router.get('/recommendations/rounds/:id/candidates/:userId', auth({ roles: ['ADMIN', 'CAPTAIN'] }), candidateController.getProfile);
-router.post('/recommendations/rounds/:id/candidates/:userId/override', auth({ roles: ['ADMIN'] }), candidateController.submitOverride);
+// Captain roster
+router.get('/roster', auth({ roles: ['ADMIN'] }), candidateController.getRoster);
+router.patch('/roster/:studentId/captain', auth({ roles: ['ADMIN'] }), candidateController.setCaptain);
+router.get('/captains', candidateController.getCaptains);
 
 router.get('/history', auth({ roles: ['ADMIN'] }), candidateController.getHistory);
 

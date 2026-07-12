@@ -1,12 +1,11 @@
 'use strict';
 
 const seatService = require('../services/seatService');
-const { successResponse } = require('../utils/apiResponse');
 
 async function generatePlan(req, res, next) {
   try {
     const plan = await seatService.generatePlan(req.body);
-    res.status(201).json(successResponse(plan));
+    res.status(201).json({ status: 'success', data: plan });
   } catch (error) {
     next(error);
   }
@@ -15,7 +14,7 @@ async function generatePlan(req, res, next) {
 async function getLatestPlan(req, res, next) {
   try {
     const plan = await seatService.getLatestPlan();
-    res.json(successResponse(plan));
+    res.json({ status: 'success', data: plan });
   } catch (error) {
     next(error);
   }
@@ -24,7 +23,7 @@ async function getLatestPlan(req, res, next) {
 async function getPlan(req, res, next) {
   try {
     const plan = await seatService.getPlanById(req.params.id);
-    res.json(successResponse(plan));
+    res.json({ status: 'success', data: plan });
   } catch (error) {
     next(error);
   }
@@ -33,7 +32,7 @@ async function getPlan(req, res, next) {
 async function getAllPlans(req, res, next) {
   try {
     const plans = await seatService.getAllPlans();
-    res.json(successResponse(plans));
+    res.json({ status: 'success', data: plans });
   } catch (error) {
     next(error);
   }
@@ -51,7 +50,7 @@ async function deletePlan(req, res, next) {
 async function getConstraints(req, res, next) {
   try {
     const constraints = await seatService.getConstraints(req.params.id);
-    res.json(successResponse(constraints));
+    res.json({ status: 'success', data: constraints });
   } catch (error) {
     next(error);
   }
@@ -60,7 +59,7 @@ async function getConstraints(req, res, next) {
 async function addConstraint(req, res, next) {
   try {
     const constraint = await seatService.addConstraint(req.params.id, req.body);
-    res.status(201).json(successResponse(constraint));
+    res.status(201).json({ status: 'success', data: constraint });
   } catch (error) {
     next(error);
   }
@@ -69,7 +68,7 @@ async function addConstraint(req, res, next) {
 async function getLineOfSight(req, res, next) {
   try {
     const data = await seatService.getLineOfSight(req.params.id);
-    res.json(successResponse(data));
+    res.json({ status: 'success', data });
   } catch (error) {
     next(error);
   }
@@ -78,7 +77,7 @@ async function getLineOfSight(req, res, next) {
 async function moveSeat(req, res, next) {
   try {
     const seat = await seatService.moveSeat(req.params.id, req.params.seatId, req.body);
-    res.json(successResponse(seat));
+    res.json({ status: 'success', data: seat });
   } catch (error) {
     next(error);
   }

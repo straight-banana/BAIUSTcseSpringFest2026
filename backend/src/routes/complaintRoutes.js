@@ -14,7 +14,6 @@ router.get('/dashboard', auth({ roles: ['ADMIN', 'CAPTAIN'] }), complaintControl
 
 router.get('/:id', auth(), complaintController.getComplaint);
 router.put('/:id/image', auth(), upload.single('image'), complaintController.uploadImage);
-router.post('/:id/image', auth(), upload.single('image'), complaintController.uploadComplaintImage);
 router.get('/:id/history', auth(), complaintController.getHistory);
 router.patch('/:id/status', auth({ roles: ['ADMIN', 'CAPTAIN'] }), complaintController.updateStatus);
 router.patch('/:id/warn', auth({ roles: ['ADMIN', 'CAPTAIN'] }), complaintController.addWarning);

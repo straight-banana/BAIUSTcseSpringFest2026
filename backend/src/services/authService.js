@@ -19,30 +19,17 @@ function encryptIdentity(text) {
   return `${iv.toString('hex')}:${tag.toString('hex')}:${encrypted.toString('hex')}`;
 }
 
-function normalizeAuthRole(role, isCaptain = false) {
-  if (role === 'CAPTAIN') return 'STUDENT';
-  if (role === 'ADMIN') return 'ADMIN';
-  return isCaptain ? 'CAPTAIN' : 'STUDENT';
-}
-
-function effectiveRole(user) {
-  return user?.isCaptain ? 'CAPTAIN' : user?.role;
-}
-
 async function register({ rollNumber, name, password, role, class: cls, section, height, dateOfBirth, hasVisionProblem, hasHearingProblem }) {
   const existing = await prisma.user.findUnique({ where: { rollNumber } });
   if (existing) throw new AppError('Roll number already registered', 409);
 
   const passwordHash = await hashPassword(password);
-  const isCaptain = role === 'CAPTAIN';
-  const storedRole = normalizeAuthRole(role, isCaptain);
   const user = await prisma.user.create({
     data: {
       rollNumber,
       name,
       passwordHash,
-      role: storedRole,
-      isCaptain,
+      role: role || 'STUDENT',
       class: cls ? parseInt(cls) : null,
       section: section || null,
       height: height ? parseFloat(height) : null,
@@ -58,14 +45,14 @@ async function register({ rollNumber, name, password, role, class: cls, section,
     },
   });
 
-  const token = signToken({ id: user.id, rollNumber: user.rollNumber, role: effectiveRole(user) });
+  const token = signToken({ id: user.id, rollNumber: user.rollNumber, role: user.role });
   const refreshToken = signRefreshToken({ id: user.id });
 
   // Store hashed refresh token
   const hashedRefresh = crypto.createHash('sha256').update(refreshToken).digest('hex');
   await prisma.user.update({ where: { id: user.id }, data: { refreshToken: hashedRefresh } });
 
-  return { user: { ...user, role: effectiveRole(user) }, accessToken: token, refreshToken };
+  return { user, accessToken: token, refreshToken };
 }
 
 async function login({ rollNumber, password }) {
@@ -75,14 +62,14 @@ async function login({ rollNumber, password }) {
   const valid = await comparePassword(password, user.passwordHash);
   if (!valid) throw new AppError('Invalid roll number or password', 401);
 
-  const token = signToken({ id: user.id, rollNumber: user.rollNumber, role: effectiveRole(user) });
+  const token = signToken({ id: user.id, rollNumber: user.rollNumber, role: user.role });
   const refreshToken = signRefreshToken({ id: user.id });
 
   const hashedRefresh = crypto.createHash('sha256').update(refreshToken).digest('hex');
   await prisma.user.update({ where: { id: user.id }, data: { refreshToken: hashedRefresh } });
 
   const { passwordHash: _, refreshToken: __, ...safeUser } = user;
-  return { user: { ...safeUser, role: effectiveRole(user) }, token, refreshToken };
+  return { user: safeUser, token, refreshToken };
 }
 
 async function refreshToken(refreshToken) {
@@ -95,7 +82,7 @@ async function refreshToken(refreshToken) {
   const hashedIncoming = crypto.createHash('sha256').update(refreshToken).digest('hex');
   if (hashedIncoming !== user.refreshToken) throw new AppError('Refresh token mismatch', 401);
 
-  const accessToken = signToken({ id: user.id, rollNumber: user.rollNumber, role: effectiveRole(user) });
+  const accessToken = signToken({ id: user.id, rollNumber: user.rollNumber, role: user.role });
   const newRefreshToken = signRefreshToken({ id: user.id });
   const hashedRefresh = crypto.createHash('sha256').update(newRefreshToken).digest('hex');
   await prisma.user.update({ where: { id: user.id }, data: { refreshToken: hashedRefresh } });
@@ -129,7 +116,7 @@ async function updateProfile(id, { name, class: cls, section, height, dateOfBirt
   });
 
   if (!user) throw new AppError('User not found', 404);
-  return { ...user, role: effectiveRole(user) };
+  return user;
 }
 
 async function getUserById(id) {
@@ -143,7 +130,7 @@ async function getUserById(id) {
     },
   });
   if (!user) throw new AppError('User not found', 404);
-  return { ...user, role: effectiveRole(user) };
+  return user;
 }
 
 async function getSettings(userId) {

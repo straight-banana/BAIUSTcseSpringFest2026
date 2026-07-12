@@ -1,13 +1,12 @@
 'use strict';
 
 const trackerService = require('../services/trackerService');
-const { successResponse } = require('../utils/apiResponse');
 
 async function addEntry(req, res, next) {
   try {
     const data = { ...req.body, userId: req.user ? req.user.id : null };
     const entry = await trackerService.addEntry(data);
-    res.status(201).json(successResponse(entry));
+    res.status(201).json({ status: 'success', data: entry });
   } catch (error) {
     next(error);
   }
@@ -22,7 +21,7 @@ async function listEntries(req, res, next) {
       limit: parseInt(limit) || 20,
       type, status, userId
     });
-    res.json(successResponse(result));
+    res.json({ status: 'success', data: result });
   } catch (error) {
     next(error);
   }
@@ -31,7 +30,7 @@ async function listEntries(req, res, next) {
 async function getEntry(req, res, next) {
   try {
     const entry = await trackerService.getEntry(req.params.id);
-    res.json(successResponse(entry));
+    res.json({ status: 'success', data: entry });
   } catch (error) {
     next(error);
   }
@@ -42,7 +41,7 @@ async function getSummary(req, res, next) {
     const { mine } = req.query;
     const userId = mine === 'true' && req.user ? req.user.id : undefined;
     const summary = await trackerService.getSummary(userId);
-    res.json(successResponse(summary));
+    res.json({ status: 'success', data: summary });
   } catch (error) {
     next(error);
   }
@@ -52,7 +51,7 @@ async function updateStatus(req, res, next) {
   try {
     const { action } = req.body;
     const entry = await trackerService.updateEntryStatus(req.params.id, action, req.user.id);
-    res.json(successResponse(entry));
+    res.json({ status: 'success', data: entry });
   } catch (error) {
     next(error);
   }
@@ -70,7 +69,7 @@ async function deleteEntry(req, res, next) {
 async function getBudgets(req, res, next) {
   try {
     const budgets = await trackerService.getBudgets();
-    res.json(successResponse(budgets));
+    res.json({ status: 'success', data: budgets });
   } catch (error) {
     next(error);
   }
@@ -79,7 +78,7 @@ async function getBudgets(req, res, next) {
 async function getMenu(req, res, next) {
   try {
     const menu = await trackerService.getTodayMenu();
-    res.json(successResponse(menu));
+    res.json({ status: 'success', data: menu });
   } catch (error) {
     next(error);
   }
@@ -88,7 +87,7 @@ async function getMenu(req, res, next) {
 async function upsertMenu(req, res, next) {
   try {
     const menu = await trackerService.upsertMenu(req.body);
-    res.json(successResponse(menu));
+    res.json({ status: 'success', data: menu });
   } catch (error) {
     next(error);
   }

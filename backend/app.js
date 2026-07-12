@@ -12,7 +12,6 @@ const { errorHandler } = require('./src/middleware/errorHandler');
 const { requestLogger } = require('./src/middleware/logger');
 const routes = require('./src/routes/index');
 const { validateEnv } = require('./src/config/env');
-const { successResponse } = require('./src/utils/apiResponse');
 
 // Validate environment on startup
 validateEnv();
@@ -39,16 +38,6 @@ app.use(
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-app.use((req, res, next) => {
-  const originalJson = res.json.bind(res);
-  res.json = (payload) => {
-    if (payload && typeof payload === 'object' && payload.status === 'success') {
-      return originalJson(successResponse(payload.data, payload.message));
-    }
-    return originalJson(payload);
-  };
-  next();
-});
 
 // ── HTTP Request Logging ──────────────────────────────────
 app.use(morgan('dev'));

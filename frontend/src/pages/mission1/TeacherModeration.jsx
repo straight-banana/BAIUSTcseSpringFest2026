@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import PageContainer from '../../components/layout/PageContainer.jsx';
 import PageHeader from '../../components/layout/PageHeader.jsx';
 import Mission1SubNav from '../../components/mission1/Mission1SubNav.jsx';
@@ -16,46 +16,21 @@ import EmptyState from '../../components/feedback/EmptyState.jsx';
 import Timeline from '../../components/mission1/Timeline.jsx';
 import { useToast } from '../../components/feedback/Toast.jsx';
 import {
-  CATEGORIES, STATUSES, complaintStats,
+  CATEGORIES, STATUSES, complaints, complaintStats,
   recentDecisions, strikeSummary,
 } from '../../mocks/data/complaints.js';
 import { Gavel, CheckCircle2, XCircle, MessageSquareWarning, FileText, Image as ImageIcon } from 'lucide-react';
-import { listComplaints, updateComplaintStatus, warnComplaint } from '../../services/complaintsService.js';
 
 export default function TeacherModeration() {
   const toast = useToast();
-  const [rows, setRows] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
   const [q, setQ] = useState('');
   const [cat, setCat] = useState('');
   const [status, setStatus] = useState('');
   const [sort, setSort] = useState('newest');
   const [selected, setSelected] = useState(null);
 
-  useEffect(() => {
-    let alive = true;
-    setLoading(true);
-    setError(null);
-
-    listComplaints()
-      .then((result) => {
-        if (!alive) return;
-        setRows(result.complaints || []);
-      })
-      .catch((err) => {
-        if (!alive) return;
-        setError(err?.message || 'Unable to fetch complaints');
-      })
-      .finally(() => {
-        if (alive) setLoading(false);
-      });
-
-    return () => { alive = false; };
-  }, []);
-
   const list = useMemo(() => {
-    let out = rows.filter((c) => {
+    let out = complaints.filter((c) => {
       if (cat && c.category !== cat) return false;
       if (status && c.status !== status) return false;
       if (q) {
@@ -71,32 +46,16 @@ export default function TeacherModeration() {
     return out;
   }, [q, cat, status, sort]);
 
-  const decide = async ({ decision, notes }) => {
-    if (!selected) return;
-
-    const runners = {
-      resolved: () => updateComplaintStatus(selected.id, 'RESOLVED'),
-      rejected: () => updateComplaintStatus(selected.id, 'REJECTED'),
-      under_review: () => updateComplaintStatus(selected.id, 'UNDER_REVIEW'),
-      add_strike: () => warnComplaint(selected.id),
+  const decide = ({ decision, notes }) => {
+    const map = {
+      resolved: { tone: 'success', title: 'Complaint approved' },
+      rejected: { tone: 'error',   title: 'Complaint rejected' },
+      under_review: { tone: 'info', title: 'Sent back for review' },
+      add_strike:  { tone: 'warning', title: 'Strike added' },
     };
-
-    try {
-      const result = await (runners[decision] ? runners[decision]() : Promise.reject(new Error('Unknown action')));
-      setRows((prev) => prev.map((c) => c.id === selected.id ? { ...c, status: result?.status ?? c.status, warningCount: result?.warningCount ?? c.warningCount } : c));
-      const map = {
-        resolved: { tone: 'success', title: 'Complaint approved' },
-        rejected: { tone: 'error',   title: 'Complaint rejected' },
-        under_review: { tone: 'info', title: 'Sent back for review' },
-        add_strike:  { tone: 'warning', title: 'Strike added' },
-      };
-      const t = map[decision] || { tone: 'info', title: decision };
-      toast.push({ tone: t.tone, title: t.title, message: `${selected?.id}${notes ? ' · notes saved' : ''}` });
-    } catch (err) {
-      toast.push({ tone: 'error', title: 'Action failed', message: err?.message || 'Please try again.' });
-    } finally {
-      setSelected(null);
-    }
+    const t = map[decision] || { tone: 'info', title: decision };
+    toast.push({ tone: t.tone, title: t.title, message: `${selected?.id}${notes ? ' · notes saved' : ''}` });
+    setSelected(null);
   };
 
   return (

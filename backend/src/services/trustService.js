@@ -27,17 +27,6 @@ async function getUnresolvedFlags(userId) {
   });
 }
 
-async function getDashboard() {
-  const [scoreCount, openFlags, totalFlags, resolvedFlags] = await Promise.all([
-    prisma.trustScore.count(),
-    prisma.trustFlag.count({ where: { isResolved: false } }),
-    prisma.trustFlag.count(),
-    prisma.trustFlag.count({ where: { isResolved: true } }),
-  ]);
-
-  return { scoreCount, openFlags, totalFlags, resolvedFlags };
-}
-
 async function resolveFlag(flagId) {
   const flag = await prisma.trustFlag.findUnique({ where: { id: flagId } });
   if (!flag) throw new AppError('Flag not found', 404);
@@ -63,4 +52,19 @@ async function createFlag(targetId, reason) {
   return flag;
 }
 
-module.exports = { getTrustScore, getUnresolvedFlags, getDashboard, resolveFlag, createFlag };
+async function getDashboard() {
+  const [avg, openFlags, flaggedUsers, totalScores] = await Promise.all([
+    prisma.trustScore.aggregate({ _avg: { score: true } }),
+    prisma.trustFlag.count({ where: { isResolved: false } }),
+    prisma.trustFlag.findMany({ where: { isResolved: false }, distinct: ['targetId'], select: { targetId: true } }),
+    prisma.trustScore.count(),
+  ]);
+  return {
+    averageScore: avg._avg.score != null ? parseFloat(avg._avg.score.toFixed(1)) : 100,
+    openFlags,
+    flaggedUserCount: flaggedUsers.length,
+    scoredUserCount: totalScores,
+  };
+}
+
+module.exports = { getTrustScore, getUnresolvedFlags, resolveFlag, createFlag, getDashboard };

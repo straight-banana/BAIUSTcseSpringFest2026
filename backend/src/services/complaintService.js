@@ -21,22 +21,20 @@ function decryptIdentity(encrypted) {
   }
 }
 
-async function createComplaint({ category, description, anonymous, reportedById, offenderId, imageFile, metadata }) {
+async function createComplaint({ category, description, anonymous, reportedById, offenderId, imageFile }) {
   let imageUrl = null;
   if (imageFile) {
     imageUrl = await stripExifAndSave(imageFile);
   }
 
-  const parsedAnonymous = anonymous === false || anonymous === 'false' ? false : true;
   const complaint = await prisma.complaint.create({
     data: {
       category,
       description,
-      anonymous: parsedAnonymous,
-      reportedById: parsedAnonymous ? null : reportedById,
+      anonymous: anonymous !== false,
+      reportedById: anonymous === false ? reportedById : null,
       offenderId: offenderId || null,
       imageUrl,
-      metadata: metadata || null,
       statusHistory: JSON.stringify([{
         status: 'PENDING',
         changedAt: new Date().toISOString(),
@@ -46,8 +44,7 @@ async function createComplaint({ category, description, anonymous, reportedById,
     },
     select: {
       id: true, referenceCode: true, category: true, description: true,
-      anonymous: true, status: true, imageUrl: true, createdAt: true, updatedAt: true,
-      metadata: true,
+      anonymous: true, status: true, imageUrl: true, createdAt: true,
     },
   });
 
@@ -61,12 +58,11 @@ async function uploadComplaintImage(complaintId, file) {
   return prisma.complaint.update({ where: { id: complaintId }, data: { imageUrl }, select: { id: true, imageUrl: true } });
 }
 
-async function listComplaints({ page = 1, limit = 10, status, category, userRole, userId } = {}) {
+async function listComplaints({ page = 1, limit = 10, status, category } = {}) {
   const skip = (page - 1) * limit;
   const where = {};
   if (status) where.status = status;
   if (category) where.category = category;
-  if (userRole === 'STUDENT' && userId) where.reportedById = userId;
 
   const [complaints, total] = await Promise.all([
     prisma.complaint.findMany({
@@ -77,7 +73,7 @@ async function listComplaints({ page = 1, limit = 10, status, category, userRole
       select: {
         id: true, referenceCode: true, category: true, description: true,
         anonymous: true, status: true, warningCount: true, imageUrl: true,
-        createdAt: true, updatedAt: true, metadata: true,
+        createdAt: true, updatedAt: true,
         offender: { select: { id: true, name: true, rollNumber: true } },
       },
     }),
@@ -93,7 +89,7 @@ async function getComplaintById(id) {
     select: {
       id: true, referenceCode: true, category: true, description: true,
       anonymous: true, status: true, statusHistory: true, warningCount: true,
-      imageUrl: true, createdAt: true, updatedAt: true, metadata: true,
+      imageUrl: true, createdAt: true, updatedAt: true,
       offender: { select: { id: true, name: true, rollNumber: true } },
     },
   });
@@ -192,7 +188,7 @@ async function getMyComplaints(userId) {
     orderBy: { createdAt: 'desc' },
     select: {
       id: true, referenceCode: true, category: true, description: true,
-      status: true, warningCount: true, createdAt: true, metadata: true,
+      status: true, warningCount: true, createdAt: true,
     },
   });
 }
