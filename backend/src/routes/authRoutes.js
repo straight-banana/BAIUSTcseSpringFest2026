@@ -12,7 +12,10 @@ const registerSchema = Joi.object({
   rollNumber: Joi.string().required(),
   name: Joi.string().required(),
   password: Joi.string().min(6).required(),
-  role: Joi.string().valid('STUDENT', 'CAPTAIN', 'ADMIN').optional(),
+  // Captaincy is not a signup-time role — it's an isCaptain flag an admin sets later
+  // via PATCH /candidates/roster/:studentId/captain. STUDENT/ADMIN are the only
+  // valid values in the Role enum (see db/schema.prisma).
+  role: Joi.string().valid('STUDENT', 'ADMIN').optional(),
   class: Joi.string().optional(),
   section: Joi.string().optional(),
   height: Joi.number().optional(),

@@ -38,8 +38,16 @@ function auth(options = {}) {
     req.user = decoded;
     req.token = token;
 
-    if (roles.length > 0 && !roles.includes(req.user.role)) {
-      return res.status(403).json(errorResponse(`Requires role: ${roles.join(' or ')}`, 403));
+    if (roles.length > 0) {
+      // A "captain" isn't a Role enum value in the DB — it's role: STUDENT
+      // with isCaptain: true. Routes gated with roles: ['ADMIN', 'CAPTAIN']
+      // must accept that flag, not just a literal role match, or real
+      // captains get 403'd on every captain-only action.
+      const hasDirectRole = roles.includes(req.user.role);
+      const hasCaptainFlag = roles.includes('CAPTAIN') && req.user.isCaptain === true;
+      if (!hasDirectRole && !hasCaptainFlag) {
+        return res.status(403).json(errorResponse(`Requires role: ${roles.join(' or ')}`, 403));
+      }
     }
 
     next();

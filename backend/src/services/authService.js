@@ -45,7 +45,7 @@ async function register({ rollNumber, name, password, role, class: cls, section,
     },
   });
 
-  const token = signToken({ id: user.id, rollNumber: user.rollNumber, role: user.role });
+  const token = signToken({ id: user.id, rollNumber: user.rollNumber, role: user.role, isCaptain: user.isCaptain });
   const refreshToken = signRefreshToken({ id: user.id });
 
   // Store hashed refresh token
@@ -62,7 +62,7 @@ async function login({ rollNumber, password }) {
   const valid = await comparePassword(password, user.passwordHash);
   if (!valid) throw new AppError('Invalid roll number or password', 401);
 
-  const token = signToken({ id: user.id, rollNumber: user.rollNumber, role: user.role });
+  const token = signToken({ id: user.id, rollNumber: user.rollNumber, role: user.role, isCaptain: user.isCaptain });
   const refreshToken = signRefreshToken({ id: user.id });
 
   const hashedRefresh = crypto.createHash('sha256').update(refreshToken).digest('hex');
@@ -82,7 +82,7 @@ async function refreshToken(refreshToken) {
   const hashedIncoming = crypto.createHash('sha256').update(refreshToken).digest('hex');
   if (hashedIncoming !== user.refreshToken) throw new AppError('Refresh token mismatch', 401);
 
-  const accessToken = signToken({ id: user.id, rollNumber: user.rollNumber, role: user.role });
+  const accessToken = signToken({ id: user.id, rollNumber: user.rollNumber, role: user.role, isCaptain: user.isCaptain });
   const newRefreshToken = signRefreshToken({ id: user.id });
   const hashedRefresh = crypto.createHash('sha256').update(newRefreshToken).digest('hex');
   await prisma.user.update({ where: { id: user.id }, data: { refreshToken: hashedRefresh } });

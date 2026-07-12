@@ -23,7 +23,14 @@ function deriveRoles(user) {
   if (!user) return [];
   if (isTeacherStaff(user)) return ['teacher'];
   if (Array.isArray(user.roles) && user.roles.length) return user.roles.map(normalizeRole);
-  if (user.role) return [normalizeRole(user.role)];
+  if (user.role) {
+    const base = normalizeRole(user.role);
+    // Captaincy isn't its own Role value in the backend — it's role: STUDENT
+    // plus isCaptain: true. Surface it as 'captain' here so the rest of the
+    // app (route guards, nav) sees the real permission level.
+    if (base === 'student' && user.isCaptain) return ['captain'];
+    return [base];
+  }
   return ['student'];
 }
 
@@ -76,7 +83,11 @@ export function AuthProvider({ children }) {
   const applyAuthResult = (u, chosenRole) => {
     persistUser(u);
     const roles = deriveRoles(u);
-    const pick = normalizeRole(chosenRole) || (roles.length === 1 ? roles[0] : null);
+    // The role the backend actually returned is the source of truth — the
+    // login form's tab is just a UX hint (which field to show) and only
+    // matters as a fallback when the backend didn't give us enough to go on
+    // (e.g. offline/demo-mode fallback, where `roles` is built from it anyway).
+    const pick = (roles.length === 1 ? roles[0] : null) || normalizeRole(chosenRole);
     if (pick) setRole(pick);
   };
 

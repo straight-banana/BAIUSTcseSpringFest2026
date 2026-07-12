@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Hash, ArrowRight, Loader2, Lock, GraduationCap, Users, IdCard } from 'lucide-react';
+import { Hash, ArrowRight, Loader2, Lock, GraduationCap, Users } from 'lucide-react';
 import AuthShell from '../../components/auth/AuthShell.jsx';
 import LoginCard from '../../components/auth/LoginCard.jsx';
 import FormField from '../../components/forms/FormField.jsx';
@@ -10,10 +10,15 @@ import { useAuth } from '../../context/AuthContext.jsx';
 const CLASSES = ['6', '7', '8', '9', '10'];
 const SECTIONS = ['A', 'B', 'C', 'D'];
 
+// Note: there's no separate "Teacher" tab here. The backend has no teacher
+// account type (no staffRole field, no Teacher ID scheme) — office/admin
+// accounts sign in with the same roll-number + password flow as everyone
+// else, and their actual role/isCaptain status comes back from the backend
+// on login (see AuthContext). These tabs are just a UX hint, not the source
+// of truth for what the account can actually do.
 const ROLE_TABS = [
   { value: 'student', label: 'Student' },
   { value: 'captain', label: 'Class Captain' },
-  { value: 'teacher', label: 'Teacher' },
 ];
 
 export default function RollLogin() {
@@ -23,27 +28,20 @@ export default function RollLogin() {
   const [className, setClassName] = useState('9');
   const [section, setSection] = useState('C');
   const [rollNumber, setRoll] = useState('');
-  const [teacherId, setTeacherId] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  useEffect(() => { setError(''); }, [rollNumber, teacherId, password, className, section, role]);
+  useEffect(() => { setError(''); }, [rollNumber, password, className, section, role]);
 
-  const isTeacher = role === 'teacher';
-  const canSubmit =
-    (isTeacher ? teacherId.trim().length >= 1 : rollNumber.trim().length >= 1) &&
-    password.length >= 1 && !loading;
+  const canSubmit = rollNumber.trim().length >= 1 && password.length >= 1 && !loading;
 
   const submit = async (e) => {
     e.preventDefault();
     if (!canSubmit) return;
     setLoading(true);
-    const composedRoll = isTeacher
-      ? teacherId.trim()
-      : `${className}${section}-${rollNumber.trim()}`;
-    const authRole = role;
-    const res = await signIn({ rollNumber: composedRoll, password, role: authRole });
+    const composedRoll = `${className}${section}-${rollNumber.trim()}`;
+    const res = await signIn({ rollNumber: composedRoll, password, role });
     setLoading(false);
     if (!res.success) { setError(res.error || 'Login failed'); return; }
     nav('/auth/loading');
@@ -53,69 +51,46 @@ export default function RollLogin() {
     <AuthShell centered>
       <LoginCard
         title="Sign in"
-        description={
-          isTeacher
-            ? 'Teachers sign in with their assigned Teacher ID.'
-            : 'Enter your class, section, roll number and password to continue.'
-        }
+        description="Enter your class, section, roll number and password to continue."
         footer={
           <span>
-            {isTeacher ? (
-              'Teacher accounts are provisioned by the school.'
-            ) : (
-              <>
-                Don't have an account?{' '}
-                <Link to="/auth/register" className="text-brand hover:underline">Register as student</Link>
-              </>
-            )}
+            Don't have an account?{' '}
+            <Link to="/auth/register" className="text-brand hover:underline">Register as student</Link>
+            <br />
+            Office/admin accounts sign in here too, with their roll number.
           </span>
         }
       >
         <RoleTabs value={role} onChange={setRole} />
 
         <form onSubmit={submit} className="space-y-4" noValidate>
-          {!isTeacher && (
-            <div className="grid grid-cols-2 gap-3">
-              <SelectField
-                label="Class"
-                value={className}
-                onChange={(e) => setClassName(e.target.value)}
-                icon={<GraduationCap size={14} />}
-                options={CLASSES.map((c) => ({ value: c, label: `Class ${c}` }))}
-              />
-              <SelectField
-                label="Section"
-                value={section}
-                onChange={(e) => setSection(e.target.value)}
-                icon={<Users size={14} />}
-                options={SECTIONS.map((s) => ({ value: s, label: s }))}
-              />
-            </div>
-          )}
+          <div className="grid grid-cols-2 gap-3">
+            <SelectField
+              label="Class"
+              value={className}
+              onChange={(e) => setClassName(e.target.value)}
+              icon={<GraduationCap size={14} />}
+              options={CLASSES.map((c) => ({ value: c, label: `Class ${c}` }))}
+            />
+            <SelectField
+              label="Section"
+              value={section}
+              onChange={(e) => setSection(e.target.value)}
+              icon={<Users size={14} />}
+              options={SECTIONS.map((s) => ({ value: s, label: s }))}
+            />
+          </div>
 
-          {isTeacher ? (
-            <FormField
-              label="Teacher ID"
-              name="teacherId"
-              placeholder="e.g. T001"
-              autoComplete="username"
-              value={teacherId}
-              onChange={(e) => setTeacherId(e.target.value)}
-              leadingIcon={<IdCard size={14} />}
-              maxLength={32}
-            />
-          ) : (
-            <FormField
-              label="Roll Number"
-              name="rollNumber"
-              placeholder="e.g. 005"
-              autoComplete="username"
-              value={rollNumber}
-              onChange={(e) => setRoll(e.target.value)}
-              leadingIcon={<Hash size={14} />}
-              maxLength={32}
-            />
-          )}
+          <FormField
+            label="Roll Number"
+            name="rollNumber"
+            placeholder="e.g. 005"
+            autoComplete="username"
+            value={rollNumber}
+            onChange={(e) => setRoll(e.target.value)}
+            leadingIcon={<Hash size={14} />}
+            maxLength={32}
+          />
 
           <FormField
             label="Password"
@@ -149,7 +124,7 @@ export default function RollLogin() {
 
 function RoleTabs({ value, onChange }) {
   return (
-    <div className="grid grid-cols-3 gap-1 rounded-lg border border-border bg-elevated p-1 mb-2">
+    <div className="grid grid-cols-2 gap-1 rounded-lg border border-border bg-elevated p-1 mb-2">
       {ROLE_TABS.map((r) => (
         <button
           key={r.value}
