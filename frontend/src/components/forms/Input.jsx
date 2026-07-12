@@ -1,16 +1,33 @@
-export default function Input({ label, error, className = "", ...props }) {
+import { cx } from '../../utils/index.js';
+
+export default function Input({ label, hint, error, className = '', id, leftIcon, ...props }) {
+  const inputId = id || props.name;
   return (
-    <label className="block mb-3">
+    <div className="space-y-1.5">
       {label && (
-        <span className="block text-sm font-medium text-gray-700 mb-1">
+        <label htmlFor={inputId} className="block text-xs font-medium text-fg">
           {label}
-        </span>
+        </label>
       )}
-      <input
-        className={`w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 ${className}`}
-        {...props}
-      />
-      {error && <span className="text-xs text-red-600 mt-1 block">{error}</span>}
-    </label>
+      <div className="relative">
+        {leftIcon && (
+          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted">{leftIcon}</span>
+        )}
+        <input
+          id={inputId}
+          className={cx(
+            'w-full h-9 rounded-md border bg-surface px-3 text-sm text-fg placeholder:text-subtle',
+            'transition-colors focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand',
+            leftIcon && 'pl-8',
+            error ? 'border-danger' : 'border-border',
+            className
+          )}
+          {...props}
+        />
+      </div>
+      {(hint || error) && (
+        <p className={cx('text-xs', error ? 'text-danger' : 'text-muted')}>{error || hint}</p>
+      )}
+    </div>
   );
 }

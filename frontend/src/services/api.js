@@ -1,47 +1,62 @@
-import axios from "axios";
+// Central API client — talks to the Express backend.
+// All responses follow { success, message, data } envelope.
 
-// Single Axios instance for every backend call. This replaces the old
-// Firebase SDK (`config/firebase.js`) as the one way the frontend talks to
-// the server — no other file should construct its own HTTP client.
-export const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL,
-});
+const BASE_URL =
+  import.meta.env.VITE_API_URL ||
+  import.meta.env.VITE_API_BASE_URL ||
+  'http://localhost:5000/api/v1';
 
-// Attach the access token (if we have one) to every outgoing request.
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem("accessToken");
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+export const API_BASE_URL = BASE_URL;
+const TOKEN_KEY = 'token';
+
+export function getToken() {
+  try { return localStorage.getItem(TOKEN_KEY); } catch { return null; }
+}
+export function setToken(t) {
+  try { t ? localStorage.setItem(TOKEN_KEY, t) : localStorage.removeItem(TOKEN_KEY); } catch { /* noop */ }
+}
+export function clearToken() { setToken(null); }
+
+export class ApiError extends Error {
+  constructor(message, status, payload) {
+    super(message);
+    this.status = status;
+    this.payload = payload;
   }
-  return config;
-});
+}
 
-// On a 401, try exactly one silent refresh before giving up. Prevents an
-// infinite loop by marking the request as already-retried.
-api.interceptors.response.use(
-  (response) => response,
-  async (error) => {
-    const original = error.config;
-    if (error.response?.status === 401 && !original._retry) {
-      original._retry = true;
-      try {
-        const refreshToken = localStorage.getItem("refreshToken");
-        if (!refreshToken) throw new Error("No refresh token");
+async function request(path, { method = 'GET', body, headers = {}, isForm = false, ...rest } = {}) {
+  const token = getToken();
+  const finalHeaders = {
+    ...(isForm ? {} : { 'Content-Type': 'application/json' }),
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...headers,
+  };
+  const res = await fetch(`${BASE_URL}${path}`, {
+    method,
+    headers: finalHeaders,
+    body: isForm ? body : body != null ? JSON.stringify(body) : undefined,
+    ...rest,
+  });
 
-        const { data } = await axios.post(`${import.meta.env.VITE_API_URL}/auth/refresh`, {
-          refreshToken,
-        });
+  let data = null;
+  try { data = await res.json(); } catch { /* non-json */ }
 
-        localStorage.setItem("accessToken", data.data.accessToken);
-        original.headers.Authorization = `Bearer ${data.data.accessToken}`;
-        return api(original);
-      } catch {
-        localStorage.removeItem("accessToken");
-        localStorage.removeItem("refreshToken");
-      }
-    }
-    return Promise.reject(error);
+  if (!res.ok || (data && data.success === false)) {
+    const msg = (data && (data.message || data.error)) || `Request failed (${res.status})`;
+    throw new ApiError(msg, res.status, data);
   }
-);
+  return data ?? { success: true, data: null };
+}
+
+const api = {
+  get: (path, opts) => request(path, { ...opts, method: 'GET' }),
+  post: (path, body, opts) => request(path, { ...opts, method: 'POST', body }),
+  patch: (path, body, opts) => request(path, { ...opts, method: 'PATCH', body }),
+  put: (path, body, opts) => request(path, { ...opts, method: 'PUT', body }),
+  del: (path, opts) => request(path, { ...opts, method: 'DELETE' }),
+  upload: (path, formData, opts) =>
+    request(path, { ...opts, method: 'POST', body: formData, isForm: true }),
+};
 
 export default api;

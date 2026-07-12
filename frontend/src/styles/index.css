@@ -2,11 +2,179 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --color-primary: #4f46e5;
-  --color-bg: #f9fafb;
+@layer base {
+  :root {
+    /* Clean white app + orange theme chrome */
+    --bg: 255 255 255;         /* pure white page background */
+    --surface: 249 250 251;    /* subtle gray for muted surfaces */
+    --elevated: 255 255 255;
+    --border: 229 231 235;     /* neutral hairline */
+    --rule: 17 24 39;          /* near-black ink */
+    --fg: 17 24 39;
+    --muted: 75 85 99;
+    --subtle: 156 163 175;
+    --brand: 178 232 200;      /* mint / light green */
+    --brand-fg: 20 60 40;
+    --brand-soft: 220 245 230;
+    --accent: 178 232 200;
+    --accent-fg: 20 60 40;
+    --success: 22 128 66;
+    --warning: 220 60 50;
+    --danger: 198 40 40;
+    /* Chrome (sidebar + topbar) share the same theme color */
+    --sidebar-bg: 178 232 200;
+    --sidebar-bg-strong: 140 210 170;
+    --chrome-fg: 20 60 40;     /* deep green text for contrast on light mint */
+  }
+
+
+
+
+
+
+  .dark {
+    /* Body bg = old header text color (deep green); text = old header bg (mint) */
+    --bg: 4 8 6;
+    --surface: 8 14 10;
+    --elevated: 14 22 16;
+    --border: 40 60 48;
+    --rule: 235 250 240;
+    --fg: 235 250 240;
+    --muted: 190 220 200;
+    --subtle: 140 170 150;
+    --brand: 178 232 200;
+    --brand-fg: 20 60 40;
+    --brand-soft: 30 90 60;
+    --accent: 178 232 200;
+    --accent-fg: 20 60 40;
+    --success: 140 210 170;
+    --warning: 230 90 90;
+    --danger: 230 110 110;
+    /* Header themed to match — deeper green bg, mint text */
+    --sidebar-bg: 2 6 4;
+    --sidebar-bg-strong: 0 3 2;
+    --chrome-fg: 235 250 240;
+  }
+
+  /* Colorblind mode — pure black & white high-contrast system.
+     All hue is removed. State is conveyed by weight, borders, and
+     iconography, not color. WCAG AAA contrast (21:1) everywhere. */
+  .colorblind {
+    --bg: 255 255 255;
+    --surface: 255 255 255;
+    --elevated: 255 255 255;
+    --border: 0 0 0;
+    --rule: 0 0 0;
+    --fg: 0 0 0;
+    --muted: 0 0 0;
+    --subtle: 60 60 60;
+    --brand: 0 0 0;
+    --brand-fg: 255 255 255;
+    --brand-soft: 240 240 240;
+    --accent: 0 0 0;
+    --accent-fg: 255 255 255;
+    --success: 0 0 0;
+    --warning: 0 0 0;
+    --danger: 0 0 0;
+    --sidebar-bg: 0 0 0;
+    --sidebar-bg-strong: 0 0 0;
+    --chrome-fg: 255 255 255;
+  }
+
+  /* Extra hardening: force 1px black borders and remove decorative fills
+     so state is legible by structure, not hue. */
+  .colorblind * {
+    text-shadow: none !important;
+    box-shadow: none !important;
+  }
+  .colorblind img,
+  .colorblind svg { filter: grayscale(100%) contrast(1.1); }
+  .colorblind button,
+  .colorblind input,
+  .colorblind select,
+  .colorblind textarea,
+  .colorblind [role="button"] {
+    border: 1px solid rgb(var(--fg));
+  }
+  /* Underline every link so it's distinguishable without color */
+  .colorblind a { text-decoration: underline; }
+  /* Danger/live indicators become bold black instead of red */
+  .colorblind [class*="bg-danger"],
+  .colorblind [class*="bg-red"] { background: rgb(var(--fg)) !important; color: rgb(var(--bg)) !important; }
+  .colorblind [class*="text-danger"],
+  .colorblind [class*="text-red"] { color: rgb(var(--fg)) !important; font-weight: 700; }
+
+  html, body, #root { height: 100%; }
+  body {
+    margin: 0;
+    font-family: 'Hind', ui-sans-serif, system-ui, -apple-system, sans-serif;
+    background: rgb(var(--bg));
+    color: rgb(var(--fg));
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-feature-settings: "ss01", "cv11";
+  }
+
+  /* Pure white surface — no paper grid overlay */
+  body::before { content: none; }
+
+  #root { position: relative; z-index: 1; }
+
+  /* Visible focus ring — brief-mandated accessibility floor */
+  *:focus-visible {
+    outline: 2px solid rgb(var(--fg));
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-thumb {
+    background: rgb(var(--rule) / 0.2);
+    border: 2px solid rgb(var(--bg));
+  }
+  ::-webkit-scrollbar-thumb:hover { background: rgb(var(--rule) / 0.35); }
 }
 
-body {
-  background-color: var(--color-bg);
+@layer utilities {
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+  /* Editorial helpers */
+  .font-display { font-family: 'Archivo Black', ui-sans-serif, system-ui, sans-serif; letter-spacing: -0.01em; }
+  .eyebrow {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: rgb(var(--muted));
+  }
+  .rule-ink { border-color: rgb(var(--rule) / 0.15); }
+  .rule-ink-strong { border-color: rgb(var(--rule) / 0.55); }
+  .bg-paper { background: rgb(var(--bg)); }
+  .bg-ink { background: rgb(var(--rule)); }
+  .text-ink { color: rgb(var(--rule)); }
+
+  /* LIVE stamp — reserved animation for the single meaningful signal */
+  @keyframes stamp-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgb(var(--danger) / 0.55); }
+    50%      { box-shadow: 0 0 0 6px rgb(var(--danger) / 0); }
+  }
+  .stamp-live { animation: stamp-pulse 1.8s ease-out infinite; }
+
+  /* Meter slot fill — orchestrated single moment */
+  @keyframes slot-fill {
+    from { transform: scaleY(0); }
+    to   { transform: scaleY(1); }
+  }
+  .slot-fill { transform-origin: bottom; animation: slot-fill 480ms cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }

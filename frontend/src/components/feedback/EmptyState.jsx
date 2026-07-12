@@ -1,13 +1,14 @@
-export default function EmptyState({
-  title = "Nothing here yet",
-  description = "",
-  action = null,
-}) {
+import { Inbox } from 'lucide-react';
+
+export default function EmptyState({ title = 'Nothing here yet', message = '', icon, action }) {
   return (
-    <div className="text-center p-10 text-gray-500">
-      <h3 className="font-medium text-gray-700 mb-1">{title}</h3>
-      {description && <p className="text-sm mb-3">{description}</p>}
-      {action}
+    <div className="rounded-xl border border-dashed border-border p-10 text-center bg-surface">
+      <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-elevated text-muted">
+        {icon || <Inbox size={18} />}
+      </div>
+      <p className="text-sm font-medium text-fg">{title}</p>
+      {message && <p className="mt-1 text-xs text-muted">{message}</p>}
+      {action && <div className="mt-4 flex justify-center">{action}</div>}
     </div>
   );
 }

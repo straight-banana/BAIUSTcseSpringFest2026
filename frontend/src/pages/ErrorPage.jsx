@@ -1,8 +1,10 @@
-export default function ErrorPage({ message = "Something went wrong." }) {
+import ErrorState from '../components/feedback/ErrorState.jsx';
+import PageContainer from '../components/layout/PageContainer.jsx';
+
+export default function ErrorPage() {
   return (
-    <div className="max-w-md mx-auto p-8 text-center">
-      <h1 className="text-2xl font-semibold text-red-600 mb-2">Error</h1>
-      <p className="text-gray-600">{message}</p>
-    </div>
+    <PageContainer>
+      <ErrorState title="Something went wrong" message="Please try again in a moment." />
+    </PageContainer>
   );
 }

@@ -1,15 +1,26 @@
-export default function Badge({ children, color = "gray" }) {
-  const colors = {
-    gray: "bg-gray-100 text-gray-700",
-    green: "bg-green-100 text-green-700",
-    red: "bg-red-100 text-red-700",
-    indigo: "bg-indigo-100 text-indigo-700",
-  };
+import { cx } from '../../utils/index.js';
 
+const tones = {
+  neutral: 'bg-elevated text-ink border-ink/20',
+  brand: 'bg-brand-soft text-ink border-ochre/40',
+  ochre: 'bg-ochre text-white border-transparent',
+  success: 'bg-success/12 text-success border-success/30',
+  warning: 'bg-brand-soft text-ink border-ochre/40',
+  danger: 'bg-danger text-white border-transparent',
+  live: 'bg-danger text-white border-transparent',
+};
+
+export default function Badge({ children, tone = 'neutral', className = '' }) {
+  const live = tone === 'live';
   return (
     <span
-      className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${colors[color]}`}
+      className={cx(
+        'inline-flex items-center gap-1.5 border px-2 py-0.5 rounded-sm font-mono text-[10px] uppercase tracking-widest font-medium',
+        tones[tone] || tones.neutral,
+        className
+      )}
     >
+      {live && <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-white stamp-live" />}
       {children}
     </span>
   );
