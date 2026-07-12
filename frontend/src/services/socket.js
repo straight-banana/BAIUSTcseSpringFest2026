@@ -24,3 +24,15 @@ export function disconnectSocket() {
 export function joinAdminRoom() {
   getSocket().emit('join:admin');
 }
+
+// Convenience subscribers. Return an `off()` unsubscribe.
+function subscribe(event, handler) {
+  const s = getSocket();
+  s.on(event, handler);
+  return () => s.off(event, handler);
+}
+
+export const onSosNew = (fn) => subscribe('sos:new', fn);
+export const onSosResolved = (fn) => subscribe('sos:resolved', fn);
+export const onSosClaimed = (fn) => subscribe('sos:claimed', fn);
+export const onNotification = (fn) => subscribe('notification', fn);

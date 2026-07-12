@@ -21,7 +21,9 @@ export const uploadComplaintImage = async (complaintId, file) => {
 };
 
 export const listComplaints = () => api.get('/complaints').then((r) => r.data);
+export const listMyComplaints = () => api.get('/complaints/my').then((r) => r.data);
 export const getComplaint = (id) => api.get(`/complaints/${id}`).then((r) => r.data);
+export const getComplaintHistory = (id) => api.get(`/complaints/${id}/history`).then((r) => r.data);
 export const getComplaintDashboard = () => api.get('/complaints/dashboard').then((r) => r.data);
 export const updateComplaintStatus = (id, status) =>
   api.patch(`/complaints/${id}/status`, { status }).then((r) => r.data);
