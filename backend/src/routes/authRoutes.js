@@ -15,13 +15,17 @@ const registerSchema = Joi.object({
   // Captaincy is not a signup-time role — it's an isCaptain flag an admin sets later
   // via PATCH /candidates/roster/:studentId/captain. STUDENT/ADMIN are the only
   // valid values in the Role enum (see db/schema.prisma).
-  role: Joi.string().valid('STUDENT', 'ADMIN').optional(),
+  role: Joi.string().valid('STUDENT', 'ADMIN', 'CAPTAIN').insensitive().optional(),
   class: Joi.string().optional(),
+  className: Joi.string().optional(),
   section: Joi.string().optional(),
   height: Joi.number().optional(),
   dateOfBirth: Joi.date().iso().optional(),
+  dob: Joi.date().iso().optional(),
   hasVisionProblem: Joi.boolean().optional(),
   hasHearingProblem: Joi.boolean().optional(),
+  vision: Joi.string().optional(),
+  hearing: Joi.string().optional(),
 });
 
 const loginSchema = Joi.object({

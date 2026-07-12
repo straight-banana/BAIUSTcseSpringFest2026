@@ -94,41 +94,28 @@ export function AuthProvider({ children }) {
   const signIn = useCallback(async ({ rollNumber, password, role: chosenRole }) => {
     setError(null);
     try {
-      let u;
-      try {
-        const res = await authService.login({ rollNumber, password });
-        u = res.user;
-      } catch (e) {
-        // Fallback for offline / no-backend demo mode
-        u = { rollNumber, name: rollNumber, roles: [normalizeRole(chosenRole) || 'student'] };
-      }
+      const res = await authService.login({ rollNumber, password });
+      const u = res.user;
       applyAuthResult(u, chosenRole);
       return { success: true, data: u };
     } catch (e) {
-      setError(e.message);
-      return { success: false, error: e.message };
+      const message = e?.message || 'Unable to sign in';
+      setError(message);
+      return { success: false, error: message };
     }
   }, []);
 
   const signUp = useCallback(async ({ rollNumber, name, password, role: chosenRole, className, section }) => {
     setError(null);
     try {
-      let u;
-      try {
-        const res = await authService.register({ rollNumber, name, password, role: normalizeRole(chosenRole), className, section });
-        u = res.user;
-      } catch (e) {
-        u = { rollNumber, name, roles: [normalizeRole(chosenRole) || 'student'], className, section };
-      }
-      // Ensure the chosen role is on the user so guards work
-      if (chosenRole && !u.roles?.includes(normalizeRole(chosenRole))) {
-        u = { ...u, roles: [normalizeRole(chosenRole)] };
-      }
+      const res = await authService.register({ rollNumber, name, password, role: normalizeRole(chosenRole), className, section });
+      const u = res.user;
       applyAuthResult(u, chosenRole);
       return { success: true, data: u };
     } catch (e) {
-      setError(e.message);
-      return { success: false, error: e.message };
+      const message = e?.message || 'Unable to create account';
+      setError(message);
+      return { success: false, error: message };
     }
   }, []);
 
