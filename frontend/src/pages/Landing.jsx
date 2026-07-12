@@ -152,7 +152,7 @@ export default function Landing() {
                 style={{ animationDelay: `${(i % 6) * 40}ms` }}
               >
                 <div className="flex items-center justify-between">
-                  <div className="h-10 w-10 rounded-xl bg-brand/20 text-brand-fg grid place-items-center">
+                  <div className="h-10 w-10 rounded-xl bg-brand/15 text-brand ring-1 ring-brand/40 grid place-items-center">
                     <Icon size={18} />
                   </div>
                   <span className="text-xs font-mono text-subtle">M{String(m.n).padStart(2, '0')}</span>

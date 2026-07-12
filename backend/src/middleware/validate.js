@@ -1,16 +1,27 @@
-import { errorResponse } from "../utils/apiResponse.js";
+'use strict';
 
-// Runs a Zod schema (from src/validators/*) against req.body. On failure,
-// responds 400 with the first validation issue instead of reaching the
-// controller at all.
-export function validate(schema) {
-  return (req, res, next) => {
-    const result = schema.safeParse(req.body);
-    if (!result.success) {
-      const issue = result.error.issues[0];
-      return res.status(400).json(errorResponse(`${issue.path.join(".")}: ${issue.message}`));
-    }
-    req.body = result.data;
-    next();
-  };
+const { validationResult } = require('express-validator');
+const { errorResponse } = require('../utils/apiResponse');
+
+/**
+ * Runs express-validator checks. If validation fails, returns 422.
+ * Place AFTER the validator chain array in a route definition:
+ *
+ *   router.post('/path', [...validatorChain], validate, handler)
+ */
+function validate(req, res, next) {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    const messages = errors.array().map((e) => ({
+      field: e.path,
+      message: e.msg,
+    }));
+    return res.status(422).json({
+      ...errorResponse('Validation failed', 422),
+      errors: messages,
+    });
+  }
+  next();
 }
+
+module.exports = { validate };

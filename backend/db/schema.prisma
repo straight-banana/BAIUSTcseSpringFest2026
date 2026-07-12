@@ -1,7 +1,7 @@
-// Single source of truth for table shape. Update contracts/db-schema.md in
-// the same change whenever a model here changes — they must stay in sync.
-// Run `npx prisma migrate dev --name <description>` after editing this file
-// to generate a migration; never hand-edit files under db/migrations.
+// Hackathon Backend — Full Schema
+// Missions: Auth, 1 (Complaints), 2 (Seats), 4 (Tracker), 5 (SOS),
+//           7 (Peer Ratings), 8 (Candidate Engine), 9 (Captain Voting), 10 (Trust Graph)
+// AI Missions 3 & 6 deployed separately.
 
 generator client {
   provider = "prisma-client-js"
@@ -12,37 +12,472 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ══════════════════════════════════════════════════════════════
+// ENUMS
+// ══════════════════════════════════════════════════════════════
+
+enum Role {
+  STUDENT
+  ADMIN
+}
+
+// ── Complaints ────────────────────────────────────────────────
+enum ComplaintCategory {
+  TIFFIN_THEFT
+  BRIBE
+  LARGE_SYLLABUS
+  BULLYING
+  OTHER
+}
+
+enum ComplaintStatus {
+  PENDING
+  UNDER_REVIEW
+  INVESTIGATING
+  RESOLVED
+  REJECTED
+}
+
+// ── Tracker / Tiffin ──────────────────────────────────────────
+enum MoneyTrackType {
+  WASHROOM_TAX
+  STOLEN_FOOD
+  BRIBE_PAYMENT
+  OTHER_EXPENSE
+}
+
+enum PaymentMethod {
+  CASH
+  BKASH
+  NAGAD
+  CARD
+}
+
+enum TransactionStatus {
+  PENDING
+  COMPLETED
+  CANCELLED
+  REFUNDED
+}
+
+// ── SOS ───────────────────────────────────────────────────────
+enum SosLocation {
+  LIBRARY
+  PLAYGROUND
+  CORRIDOR
+  CLASSROOM
+  CANTEEN
+  OFFICE
+  RESTROOM
+  OTHER
+}
+
+enum SosType {
+  MEDICAL
+  BULLYING
+  THEFT
+  FIRE
+  OTHER
+}
+
+enum SosSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum SosStatus {
+  ACTIVE
+  CLAIMED
+  RESOLVED
+}
+
+// ── Peer Ratings ──────────────────────────────────────────────
+enum RatingStatus {
+  PENDING
+  APPROVED
+  FLAGGED
+  REJECTED
+}
+
+// ── Elections ─────────────────────────────────────────────────
+enum ElectionStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  CLOSED
+  PUBLISHED
+}
+
+// ══════════════════════════════════════════════════════════════
+// CORE MODELS
+// ══════════════════════════════════════════════════════════════
+
 model User {
-  id            String         @id @default(uuid())
-  email         String         @unique
-  passwordHash  String
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  examples      Example[]
-  refreshTokens RefreshToken[]
+  id                String    @id @default(uuid())
+  rollNumber        String    @unique
+  name              String
+  passwordHash      String
+  role              Role      @default(STUDENT)
+  // Profile fields
+  class             Int?
+  section           String?   // A / B / C
+  height            Float?    // cm
+  dateOfBirth       DateTime?
+  hasVisionProblem  Boolean   @default(false)
+  hasHearingProblem Boolean   @default(false)
+  settings          Json?     @default("{}")
+  // Captain system
+  isCaptain         Boolean   @default(false)
+  strikeCount       Int       @default(0)  // proven complaints against them
+  // Auth
+  refreshToken      String?   // hashed refresh token
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  complaints        Complaint[]        @relation("SubmittedComplaints")
+  offenderOf        Complaint[]        @relation("OffenderComplaints")
+  sosAlerts         SosAlert[]         @relation("ReportedSos")
+  claimedAlerts     SosAlert[]         @relation("ClaimedSos")
+  moneyTracks       MoneyTrack[]
+  ratingRecords     RatingRecord[]     @relation("RaterRecords")
+  receivedRatings   PeerRating[]       @relation("ReceivedRatings")
+  candidateProfiles CandidateProfile[]
+  electionCandidates ElectionCandidate[]
+  trustScore        TrustScore?
+  trustFlags        TrustFlag[]        @relation("FlaggedUser")
+  notifications     Notification[]
 
   @@map("users")
 }
 
-model RefreshToken {
-  id        String   @id @default(uuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tokenHash String
-  createdAt DateTime @default(now())
-  revokedAt DateTime?
+// ══════════════════════════════════════════════════════════════
+// MISSION 1 — COMPLAINTS / WHISTLEBLOWER
+// ══════════════════════════════════════════════════════════════
 
-  @@map("refresh_tokens")
+model Complaint {
+  id                String          @id @default(uuid())
+  category          ComplaintCategory
+  description       String
+  anonymous         Boolean         @default(true)
+  encryptedIdentity String?         // AES-256 encrypted, only if anonymous=false
+  imageUrl          String?
+  metadata          Json?
+  referenceCode     String          @unique @default(uuid())
+  // Status & history
+  status            ComplaintStatus @default(PENDING)
+  statusHistory     Json            @default("[]") // [{status, changedAt, changedBy, note}]
+  // Who filed it (null if truly anonymous)
+  reportedBy        User?           @relation("SubmittedComplaints", fields: [reportedById], references: [id])
+  reportedById      String?
+  // Who it's against (the offender)
+  offender          User?           @relation("OffenderComplaints", fields: [offenderId], references: [id])
+  offenderId        String?
+  // Warning tracking
+  warningCount      Int             @default(0)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  @@map("complaints")
 }
 
-model Example {
+// ══════════════════════════════════════════════════════════════
+// MISSION 2 — SEAT PLANNER
+// ══════════════════════════════════════════════════════════════
+
+model SeatPlan {
+  id          String          @id @default(uuid())
+  planName    String          @default("default")
+  gridRows    Int
+  gridCols    Int
+  isActive    Boolean         @default(true)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  seats       Seat[]
+  constraints SeatConstraint[]
+
+  @@map("seat_plans")
+}
+
+model Seat {
+  id                String   @id @default(uuid())
+  name              String
+  rollNumber        String
+  height            Float
+  row               Int
+  col               Int
+  isKuddus          Boolean  @default(false)
+  hasVisionProblem  Boolean  @default(false)
+  hasHearingProblem Boolean  @default(false)
+  notes             String?
+
+  plan              SeatPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  planId            String
+
+  @@unique([planId, row, col])
+  @@map("seats")
+}
+
+model SeatConstraint {
+  id         String   @id @default(uuid())
+  type       String   // VISION_FRONT | HEARING_CENTER | RESERVED | FRONT_ROW | LINE_OF_SIGHT
+  rollNumber String
+  notes      String?
+  createdAt  DateTime @default(now())
+
+  plan       SeatPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  planId     String
+
+  @@map("seat_constraints")
+}
+
+// ══════════════════════════════════════════════════════════════
+// MISSION 4 — TIFFIN / MONEY TRACKER
+// ══════════════════════════════════════════════════════════════
+
+model MoneyTrack {
+  id            String            @id @default(uuid())
+  type          MoneyTrackType
+  amount        Decimal           @db.Decimal(10, 2)
+  description   String
+  paymentMethod PaymentMethod     @default(CASH)
+  status        TransactionStatus @default(COMPLETED)
+  auditHistory  Json              @default("[]") // [{action, at, by, note}]
+  date          DateTime          @default(now())
+  createdAt     DateTime          @default(now())
+
+  user          User?             @relation(fields: [userId], references: [id])
+  userId        String?
+
+  @@map("money_tracks")
+}
+
+model Budget {
+  id     String         @id @default(uuid())
+  type   MoneyTrackType @unique
+  limit  Decimal        @db.Decimal(10, 2)
+  period String         @default("monthly")
+
+  @@map("budgets")
+}
+
+model TiffinMenu {
   id        String   @id @default(uuid())
-  name      String
-  status    String   @default("active")
-  ownerId   String
-  owner     User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  date      DateTime @unique
+  items     Json     // [{name, price, isVeg, calories}]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@map("examples")
+  @@map("tiffin_menus")
+}
+
+// ══════════════════════════════════════════════════════════════
+// MISSION 5 — SOS / EMERGENCY
+// ══════════════════════════════════════════════════════════════
+
+model SosAlert {
+  id           String      @id @default(uuid())
+  location     SosLocation
+  type         SosType     @default(OTHER)
+  severity     SosSeverity @default(MEDIUM)
+  message      String?
+  status       SosStatus   @default(ACTIVE)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  reportedBy   User?       @relation("ReportedSos", fields: [reportedById], references: [id])
+  reportedById String?
+  claimedBy    User?       @relation("ClaimedSos", fields: [claimedById], references: [id])
+  claimedById  String?
+
+  @@map("sos_alerts")
+}
+
+// ══════════════════════════════════════════════════════════════
+// MISSION 7 — PEER RATINGS
+// ══════════════════════════════════════════════════════════════
+
+// The rating itself — no link to who wrote it
+model PeerRating {
+  id        String       @id @default(uuid())
+  scores    Json         // {leadership:4, communication:3, teamwork:5, punctuality:4, attitude:3}
+  comment   String?
+  status    RatingStatus @default(PENDING)
+  createdAt DateTime     @default(now())
+
+  ratee     User         @relation("ReceivedRatings", fields: [rateeId], references: [id])
+  rateeId   String
+
+  @@map("peer_ratings")
+}
+
+// Tracks who has rated whom — prevents double-rating, identity NOT linked to rating content
+model RatingRecord {
+  id        String   @id @default(uuid())
+  raterId   String
+  rateeId   String
+  createdAt DateTime @default(now())
+
+  rater     User     @relation("RaterRecords", fields: [raterId], references: [id])
+
+  @@unique([raterId, rateeId])
+  @@map("rating_records")
+}
+
+// ══════════════════════════════════════════════════════════════
+// MISSION 8 — CANDIDATE RECOMMENDATION ENGINE
+// ══════════════════════════════════════════════════════════════
+
+model CandidateRound {
+  id        String             @id @default(uuid())
+  name      String
+  weights   Json               @default("{\"leadership\":0.3,\"communication\":0.2,\"teamwork\":0.2,\"punctuality\":0.15,\"attitude\":0.15}")
+  isActive  Boolean            @default(true)
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+
+  profiles  CandidateProfile[]
+
+  @@map("candidate_rounds")
+}
+
+model CandidateProfile {
+  id             String         @id @default(uuid())
+  scores         Json           // {leadership:4.5, communication:3.8, ...}
+  achievements   Json           @default("[]")
+  strengths      Json           @default("[]")
+  improvements   Json           @default("[]")
+  computedScore  Float          @default(0)
+  badge          String?        // GOLD / SILVER / BRONZE
+  manualOverride Boolean        @default(false)
+  overrideReason String?
+  isPinned       Boolean        @default(false)
+  timeline       Json           @default("[]") // [{date, event}]
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  round          CandidateRound @relation(fields: [roundId], references: [id])
+  roundId        String
+  user           User           @relation(fields: [userId], references: [id])
+  userId         String
+
+  @@unique([roundId, userId])
+  @@map("candidate_profiles")
+}
+
+// ══════════════════════════════════════════════════════════════
+// MISSION 9 — CAPTAIN VOTING
+// ══════════════════════════════════════════════════════════════
+
+model Election {
+  id          String            @id @default(uuid())
+  title       String
+  description String?
+  status      ElectionStatus    @default(DRAFT)
+  startsAt    DateTime?
+  endsAt      DateTime?
+  activityLog Json              @default("[]") // [{action, at, by}]
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  candidates  ElectionCandidate[]
+  votes       Vote[]
+  voteRecords VoteRecord[]
+
+  @@map("elections")
+}
+
+model ElectionCandidate {
+  id          String   @id @default(uuid())
+  bio         String?
+  achievements Json    @default("[]")
+  createdAt   DateTime @default(now())
+
+  election    Election @relation(fields: [electionId], references: [id], onDelete: Cascade)
+  electionId  String
+  user        User     @relation(fields: [userId], references: [id])
+  userId      String
+
+  votes       Vote[]
+
+  @@unique([electionId, userId])
+  @@map("election_candidates")
+}
+
+// Anonymous vote — NO voter ID stored here
+model Vote {
+  id          String            @id @default(uuid())
+  rank        Int               // 1 = first choice
+  createdAt   DateTime          @default(now())
+
+  election    Election          @relation(fields: [electionId], references: [id], onDelete: Cascade)
+  electionId  String
+  candidate   ElectionCandidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  candidateId String
+
+  @@map("votes")
+}
+
+// Tracks who voted (prevents double voting) — stored separately from vote content
+model VoteRecord {
+  id         String   @id @default(uuid())
+  hashedVoterId String  // SHA-256(userId + electionId + salt) — one-way hash
+  createdAt  DateTime @default(now())
+
+  election   Election @relation(fields: [electionId], references: [id], onDelete: Cascade)
+  electionId String
+
+  @@unique([electionId, hashedVoterId])
+  @@map("vote_records")
+}
+
+// ══════════════════════════════════════════════════════════════
+// MISSION 10 — TRUST GRAPH
+// ══════════════════════════════════════════════════════════════
+
+model TrustScore {
+  id           String   @id @default(uuid())
+  score        Float    @default(100)  // 0-100
+  networkStats Json     @default("{\"connections\":0,\"positiveInteractions\":0,\"negativeInteractions\":0}")
+  updatedAt    DateTime @updatedAt
+
+  user         User     @relation(fields: [userId], references: [id])
+  userId       String   @unique
+
+  @@map("trust_scores")
+}
+
+model TrustFlag {
+  id         String    @id @default(uuid())
+  reason     String
+  isResolved Boolean   @default(false)
+  resolvedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  target     User      @relation("FlaggedUser", fields: [targetId], references: [id])
+  targetId   String
+
+  @@map("trust_flags")
+}
+
+// ══════════════════════════════════════════════════════════════
+// NOTIFICATIONS (Cross-cutting)
+// ══════════════════════════════════════════════════════════════
+
+model Notification {
+  id        String   @id @default(uuid())
+  type      String   // SOS_NEW | COMPLAINT_UPDATE | VOTE_OPENED | RATING_RECEIVED | CAPTAIN_REMOVED | TRUST_FLAG
+  title     String
+  body      String
+  metadata  Json?
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+
+  @@map("notifications")
 }

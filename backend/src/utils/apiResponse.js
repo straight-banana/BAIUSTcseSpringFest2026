@@ -1,10 +1,16 @@
-// Same envelope shape as before, just returned from callable functions
-// instead of Express routes. Keeps the frontend contract identical
-// regardless of which transport is behind it.
-export function successResponse(data = null, message = null) {
-  return { success: true, data, error: null, message };
+'use strict';
+
+/**
+ * Standard API response envelopes.
+ * Every endpoint returns { success, message, data } or { success, message }.
+ */
+
+function successResponse(data, message = 'Success') {
+  return { success: true, message, data };
 }
 
-export function errorResponse(error = "Something went wrong", message = null) {
-  return { success: false, data: null, error, message };
+function errorResponse(message = 'An error occurred', statusCode = 500) {
+  return { success: false, message, statusCode };
 }
+
+module.exports = { successResponse, errorResponse };

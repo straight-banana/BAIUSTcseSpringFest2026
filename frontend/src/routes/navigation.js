@@ -79,7 +79,8 @@ export const NAV_BY_ROLE = {
       { to: '/mission-10', label: 'Trust graph', code: '18', icon: Network },
     ]},
     { section: 'Reviews', code: 'R', items: [
-      { to: '/mission-9/results', label: 'Election results', code: 'R1', icon: Vote },
+      { to: '/mission-8', label: 'Captain engine', code: 'R1', icon: Award },
+      { to: '/mission-9/results', label: 'Election results', code: 'R2', icon: Vote },
     ]},
     ACCOUNT_TAIL,
   ],

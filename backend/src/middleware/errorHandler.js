@@ -1,15 +1,42 @@
-import { errorResponse } from "../utils/apiResponse.js";
-import { logger } from "../utils/logger.js";
+'use strict';
 
-// Last middleware in the chain (mounted in app.js). Anything passed to
-// next(err) — including errors thrown inside asyncWrapper-wrapped routes —
-// lands here instead of crashing the process or leaking a stack trace.
-// eslint-disable-next-line no-unused-vars
-export function errorHandler(err, req, res, next) {
-  logger.error(err);
+const { logger } = require('../utils/logger');
 
-  const status = err.status || 500;
-  const message = status === 500 ? "Internal server error" : err.message;
+/**
+ * Global error handler — always returns a consistent JSON envelope.
+ * Must be the LAST app.use() call in app.js.
+ */
+function errorHandler(err, req, res, _next) {
+  const statusCode = err.statusCode || err.status || 500;
+  const message = err.message || 'Internal Server Error';
 
-  res.status(status).json(errorResponse(message));
+  // Don't log 4xx client errors as errors
+  if (statusCode >= 500) {
+    logger.error(`[${req.method}] ${req.originalUrl} — ${message}`, {
+      stack: err.stack,
+      body: req.body,
+    });
+  } else {
+    logger.warn(`[${req.method}] ${req.originalUrl} — ${statusCode}: ${message}`);
+  }
+
+  res.status(statusCode).json({
+    success: false,
+    message,
+    ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
+  });
 }
+
+/**
+ * Creates a structured API error with a status code.
+ */
+class AppError extends Error {
+  constructor(message, statusCode = 500) {
+    super(message);
+    this.statusCode = statusCode;
+    this.name = 'AppError';
+    Error.captureStackTrace(this, this.constructor);
+  }
+}
+
+module.exports = { errorHandler, AppError };

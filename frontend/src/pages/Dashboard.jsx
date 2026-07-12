@@ -10,9 +10,11 @@ import {
   ShieldAlert, Siren, Grid3X3, Coins, SearchCheck, Users, ArrowUpRight,
   FileText, Download, Plus,
 } from 'lucide-react';
-import { stats, activity, tasks, notifications, chartSeries } from '../mocks/data/dashboard.js';
 import { formatNumber } from '../utils/index.js';
 import { Link } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { getDashboardActivity, getDashboardNotifications, getDashboardStats } from '../services/dashboardService.js';
+import { stats as mockStats, activity as mockActivity, tasks as mockTasks, notifications as mockNotifications, chartSeries as mockChartSeries } from '../mocks/data/dashboard.js';
 
 const ICONS = {
   students: Users, complaints: ShieldAlert, sos: Siren,
@@ -29,6 +31,58 @@ const CATEGORY_ICON = {
 export default function Dashboard() {
   // Kuddus's live warning count — the product's central number.
   const kuddusWarnings = 2;
+  const [liveStats, setLiveStats] = useState(null);
+  const [liveActivity, setLiveActivity] = useState(null);
+  const [liveNotifications, setLiveNotifications] = useState(null);
+
+  useEffect(() => {
+    let active = true;
+    Promise.all([
+      getDashboardStats(),
+      getDashboardActivity(),
+      getDashboardNotifications(true),
+    ])
+      .then(([statsData, activityData, notificationsData]) => {
+        if (!active) return;
+        setLiveStats(statsData);
+        setLiveActivity(activityData);
+        setLiveNotifications(notificationsData);
+      })
+      .catch(() => {
+        if (!active) return;
+        setLiveStats(null);
+        setLiveActivity(null);
+        setLiveNotifications(null);
+      });
+    return () => { active = false; };
+  }, []);
+
+  const stats = liveStats
+    ? [
+        { key: 'students', label: 'Total Students', value: liveStats.totalStudents || 0, trend: 0, hint: 'Live backend count' },
+        { key: 'complaints', label: 'Active Complaints', value: liveStats.totalComplaints || 0, trend: 0, hint: 'Backend count' },
+        { key: 'sos', label: 'Pending SOS', value: liveStats.activeAlerts || 0, trend: 0, hint: 'Backend count' },
+        { key: 'seats', label: 'Active Elections', value: liveStats.activeElections || 0, trend: 0, hint: 'Backend count' },
+        { key: 'ledger', label: 'Pending Ratings', value: liveStats.pendingRatings || 0, trend: 0, hint: 'Backend count' },
+        { key: 'facts', label: 'Active Complaints', value: liveStats.totalComplaints || 0, trend: 0, hint: 'Backend count' },
+      ]
+    : mockStats;
+
+  const activity = liveActivity?.length
+    ? liveActivity.map((item) => ({
+        id: item.data?.id || item.id,
+        when: new Date(item.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        who: item.type === 'COMPLAINT' ? 'Complaint' : item.type === 'SOS' ? 'SOS' : 'System',
+        what: item.type === 'COMPLAINT'
+          ? `Complaint ${item.data?.referenceCode || item.data?.id || ''} · ${item.data?.status || ''}`
+          : item.type === 'SOS'
+            ? `SOS ${item.data?.location || ''} · ${item.data?.severity || ''}`
+            : item.data?.title || 'Notification',
+      }))
+    : mockActivity;
+
+  const notifications = liveNotifications?.length ? liveNotifications : mockNotifications;
+  const chartSeries = mockChartSeries;
 
   return (
     <PageContainer>
@@ -193,7 +247,7 @@ export default function Dashboard() {
 
           <Card eyebrow="Due this week" ref="TASK">
             <ul className="divide-y divide-ink/10">
-              {tasks.map((t) => (
+              {mockTasks.map((t) => (
                 <li key={t.id} className="flex items-start justify-between gap-3 px-4 py-3">
                   <div className="min-w-0">
                     <p className="text-sm text-ink truncate">{t.label}</p>

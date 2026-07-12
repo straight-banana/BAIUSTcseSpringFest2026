@@ -9,7 +9,7 @@ import { findLocation, EMERGENCY_TIPS } from '../../mocks/data/mission5.js';
 export default function SosSuccess() {
   const state = useLocation().state || {};
   const loc = findLocation(state.location || 'classroom');
-  const id = `SOS-2026-${(2100 + Math.floor(Math.random() * 800)).toString()}`;
+  const id = state.id || `SOS-2026-${(2100 + Math.floor(Math.random() * 800)).toString()}`;
 
   return (
     <PageContainer>

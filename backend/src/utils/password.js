@@ -1,11 +1,26 @@
-import bcrypt from "bcrypt";
+'use strict';
 
-const SALT_ROUNDS = 10;
+const bcrypt = require('bcrypt');
 
-export async function hashPassword(plain) {
-  return bcrypt.hash(plain, SALT_ROUNDS);
+const SALT_ROUNDS = 12;
+
+/**
+ * Hashes a plain-text password using bcrypt.
+ * @param {string} password
+ * @returns {Promise<string>} hashed password
+ */
+async function hashPassword(password) {
+  return bcrypt.hash(password, SALT_ROUNDS);
 }
 
-export async function comparePassword(plain, hash) {
-  return bcrypt.compare(plain, hash);
+/**
+ * Compares a plain-text password with a stored hash.
+ * @param {string} password
+ * @param {string} hash
+ * @returns {Promise<boolean>}
+ */
+async function comparePassword(password, hash) {
+  return bcrypt.compare(password, hash);
 }
+
+module.exports = { hashPassword, comparePassword };

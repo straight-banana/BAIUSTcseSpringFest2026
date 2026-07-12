@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import PageContainer from '../components/layout/PageContainer.jsx';
 import PageHeader from '../components/layout/PageHeader.jsx';
 import Card from '../components/common/Card.jsx';
@@ -12,34 +12,44 @@ import { Settings as SettingsIcon, User, Check } from 'lucide-react';
 
 const PROFILE_KEY = 'akp:profile';
 
-const DEFAULT_PROFILE = {
-  name: 'Abdus Salam',
-  roll: '2026-09-014',
-  className: '9',
-  section: 'C',
-  height: 160,
-  gender: 'Male',
-  vision: 'None',
-  hearing: 'None',
-  email: 'abdus.salam@baiust.edu.bd',
-  phone: '+880 1700 000000',
-  subject: 'Mathematics',
-  staffRole: 'Class Teacher',
-};
-
 export default function Settings() {
   const { theme, toggle } = useTheme();
-  const { role } = useAuth();
+  const { user, role } = useAuth();
   const isStaff = role === 'teacher' || role === 'office';
-  const [profile, setProfile] = useState(DEFAULT_PROFILE);
+
+  // Build defaults from the logged-in user — not a hardcoded student.
+  const defaults = useMemo(() => ({
+    name: user?.name || '',
+    roll: user?.rollNumber || user?.roll || '',
+    className: user?.className || '',
+    section: user?.section || '',
+    height: user?.height || '',
+    gender: user?.gender || 'Male',
+    vision: user?.vision || 'None',
+    hearing: user?.hearing || 'None',
+    email: user?.email || '',
+    phone: user?.phone || '',
+    subject: user?.subject || '',
+    staffRole: user?.staffRole || (role === 'office' ? 'Office Staff' : 'Class Teacher'),
+  }), [user, role]);
+
+  const [profile, setProfile] = useState(defaults);
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     try {
       const raw = localStorage.getItem(PROFILE_KEY);
-      if (raw) setProfile({ ...DEFAULT_PROFILE, ...JSON.parse(raw) });
-    } catch {}
-  }, []);
+      const stored = raw ? JSON.parse(raw) : {};
+      // Only reuse stored profile if it matches the current logged-in user
+      if (stored && stored.roll && stored.roll === defaults.roll) {
+        setProfile({ ...defaults, ...stored });
+      } else {
+        setProfile(defaults);
+      }
+    } catch {
+      setProfile(defaults);
+    }
+  }, [defaults]);
 
   const set = (k) => (e) => setProfile((p) => ({ ...p, [k]: e.target.value }));
 
@@ -66,6 +76,7 @@ export default function Settings() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Input label="Full name" value={profile.name} onChange={set('name')} />
+          <Input label={isStaff ? 'Staff ID' : 'Roll number'} value={profile.roll} onChange={set('roll')} disabled />
 
           {isStaff ? (
             <>
@@ -81,7 +92,6 @@ export default function Settings() {
             </>
           ) : (
             <>
-              <Input label="Roll number" value={profile.roll} onChange={set('roll')} />
               <Input label="Class" value={profile.className} onChange={set('className')} placeholder="e.g. 9" />
               <Input label="Section" value={profile.section} onChange={set('section')} placeholder="e.g. C" />
               <Input label="Height (cm)" type="number" min={100} max={220} value={profile.height} onChange={set('height')} />
@@ -101,8 +111,8 @@ export default function Settings() {
             </>
           )}
 
-          <Input label="Email" type="email" value={profile.email} onChange={set('email')} />
-          <Input label="Phone" value={profile.phone} onChange={set('phone')} />
+          <Input label="Email" type="email" value={profile.email} onChange={set('email')} placeholder="you@example.com" />
+          <Input label="Phone" value={profile.phone} onChange={set('phone')} placeholder="+880 …" />
         </div>
 
         <div className="flex items-center gap-3 pt-2">

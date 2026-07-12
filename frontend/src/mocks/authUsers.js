@@ -7,10 +7,10 @@ export const MOCK_USERS = {
   '220001': { name: 'Jane Smith', roll: '220001', roles: ['student'], batch: '2022', dept: 'CSE' },
 
   // Seeded teacher / office accounts (login only; password mocked)
-  T001: { name: 'Dr. Ahmed Karim',  roll: 'T001', roles: ['office'], subject: 'Mathematics',  staffRole: 'Teacher' },
-  T002: { name: 'Ms. Nafisa Rahman', roll: 'T002', roles: ['office'], subject: 'English',      staffRole: 'Teacher' },
-  T003: { name: 'Mr. Ishtiak Reza',  roll: 'T003', roles: ['office'], subject: 'Physics',      staffRole: 'Teacher' },
-  T004: { name: 'Mrs. Sadia Islam',  roll: 'T004', roles: ['office'], subject: 'Chemistry',    staffRole: 'Teacher' },
+  T001: { name: 'Dr. Ahmed Karim',  roll: 'T001', roles: ['teacher'], subject: 'Mathematics',  staffRole: 'Teacher' },
+  T002: { name: 'Ms. Nafisa Rahman', roll: 'T002', roles: ['teacher'], subject: 'English',      staffRole: 'Teacher' },
+  T003: { name: 'Mr. Ishtiak Reza',  roll: 'T003', roles: ['teacher'], subject: 'Physics',      staffRole: 'Teacher' },
+  T004: { name: 'Mrs. Sadia Islam',  roll: 'T004', roles: ['teacher'], subject: 'Chemistry',    staffRole: 'Teacher' },
   O001: { name: 'Office Desk',       roll: 'O001', roles: ['office'], subject: '—',            staffRole: 'Office Admin' },
 };
 

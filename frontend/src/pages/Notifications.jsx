@@ -1,13 +1,31 @@
+import { useEffect, useState } from 'react';
 import PageContainer from '../components/layout/PageContainer.jsx';
 import PageHeader from '../components/layout/PageHeader.jsx';
 import Card from '../components/common/Card.jsx';
 import Badge from '../components/ui/Badge.jsx';
 import { Bell } from 'lucide-react';
-import { notifications } from '../mocks/data/dashboard.js';
+import { notifications as mockNotifications } from '../mocks/data/dashboard.js';
+import { getDashboardNotifications } from '../services/dashboardService.js';
 
 const toneMap = { danger: 'danger', warning: 'warning', brand: 'brand' };
 
 export default function Notifications() {
+  const [notifications, setNotifications] = useState(mockNotifications);
+
+  useEffect(() => {
+    let active = true;
+    getDashboardNotifications()
+      .then((items) => {
+        if (!active) return;
+        setNotifications(Array.isArray(items) && items.length ? items : mockNotifications);
+      })
+      .catch(() => {
+        if (!active) return;
+        setNotifications(mockNotifications);
+      });
+    return () => { active = false; };
+  }, []);
+
   return (
     <PageContainer>
       <PageHeader title="Notifications" subtitle="Recent alerts across the console." icon={<Bell size={18} />} />

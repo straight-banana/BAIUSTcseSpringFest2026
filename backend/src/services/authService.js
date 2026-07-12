@@ -1,69 +1,167 @@
-import { prisma } from "../config/prisma.js";
-import { hashPassword, comparePassword } from "../utils/password.js";
-import { signAccessToken, signRefreshToken, verifyRefreshToken } from "../utils/tokens.js";
+'use strict';
 
-function toPublicUser(user) {
-  return { id: user.id, email: user.email, createdAt: user.createdAt };
+const prisma = require('../config/prisma');
+const { hashPassword, comparePassword } = require('../utils/password');
+const { signToken, signRefreshToken, verifyRefreshToken } = require('../utils/tokens');
+const { AppError } = require('../middleware/errorHandler');
+const crypto = require('crypto');
+
+const ENCRYPTION_KEY = () => {
+  const key = process.env.ENCRYPTION_KEY || 'hackathon-default-32-byte-secret!';
+  return Buffer.from(key.padEnd(32, '0').slice(0, 32));
+};
+
+function encryptIdentity(text) {
+  const iv = crypto.randomBytes(16);
+  const cipher = crypto.createCipheriv('aes-256-gcm', ENCRYPTION_KEY(), iv);
+  const encrypted = Buffer.concat([cipher.update(text, 'utf8'), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return `${iv.toString('hex')}:${tag.toString('hex')}:${encrypted.toString('hex')}`;
 }
 
-async function issueTokens(user) {
-  const accessToken = signAccessToken({ sub: user.id, email: user.email });
-  const refreshToken = signRefreshToken({ sub: user.id });
-
-  // Store a hash of the refresh token so it can be revoked/rotated later —
-  // never store it in plaintext.
-  const tokenHash = await hashPassword(refreshToken);
-  await prisma.refreshToken.create({
-    data: { userId: user.id, tokenHash },
-  });
-
-  return { accessToken, refreshToken };
+function normalizeAuthRole(role, isCaptain = false) {
+  if (role === 'CAPTAIN') return 'STUDENT';
+  if (role === 'ADMIN') return 'ADMIN';
+  return isCaptain ? 'CAPTAIN' : 'STUDENT';
 }
 
-export async function register({ email, password }) {
-  const existing = await prisma.user.findUnique({ where: { email } });
-  if (existing) {
-    const err = new Error("An account with this email already exists");
-    err.status = 409;
-    throw err;
-  }
+function effectiveRole(user) {
+  return user?.isCaptain ? 'CAPTAIN' : user?.role;
+}
+
+async function register({ rollNumber, name, password, role, class: cls, section, height, dateOfBirth, hasVisionProblem, hasHearingProblem }) {
+  const existing = await prisma.user.findUnique({ where: { rollNumber } });
+  if (existing) throw new AppError('Roll number already registered', 409);
 
   const passwordHash = await hashPassword(password);
-  const user = await prisma.user.create({ data: { email, passwordHash } });
+  const isCaptain = role === 'CAPTAIN';
+  const storedRole = normalizeAuthRole(role, isCaptain);
+  const user = await prisma.user.create({
+    data: {
+      rollNumber,
+      name,
+      passwordHash,
+      role: storedRole,
+      isCaptain,
+      class: cls ? parseInt(cls) : null,
+      section: section || null,
+      height: height ? parseFloat(height) : null,
+      dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : null,
+      hasVisionProblem: !!hasVisionProblem,
+      hasHearingProblem: !!hasHearingProblem,
+    },
+    select: {
+      id: true, rollNumber: true, name: true, role: true,
+      class: true, section: true, height: true, dateOfBirth: true,
+      hasVisionProblem: true, hasHearingProblem: true,
+      isCaptain: true, strikeCount: true, createdAt: true,
+    },
+  });
 
-  const tokens = await issueTokens(user);
-  return { user: toPublicUser(user), ...tokens };
+  const token = signToken({ id: user.id, rollNumber: user.rollNumber, role: effectiveRole(user) });
+  const refreshToken = signRefreshToken({ id: user.id });
+
+  // Store hashed refresh token
+  const hashedRefresh = crypto.createHash('sha256').update(refreshToken).digest('hex');
+  await prisma.user.update({ where: { id: user.id }, data: { refreshToken: hashedRefresh } });
+
+  return { user: { ...user, role: effectiveRole(user) }, accessToken: token, refreshToken };
 }
 
-export async function login({ email, password }) {
-  const user = await prisma.user.findUnique({ where: { email } });
-  if (!user || !(await comparePassword(password, user.passwordHash))) {
-    const err = new Error("Invalid email or password");
-    err.status = 401;
-    throw err;
-  }
+async function login({ rollNumber, password }) {
+  const user = await prisma.user.findUnique({ where: { rollNumber } });
+  if (!user) throw new AppError('Invalid roll number or password', 401);
 
-  const tokens = await issueTokens(user);
-  return { user: toPublicUser(user), ...tokens };
+  const valid = await comparePassword(password, user.passwordHash);
+  if (!valid) throw new AppError('Invalid roll number or password', 401);
+
+  const token = signToken({ id: user.id, rollNumber: user.rollNumber, role: effectiveRole(user) });
+  const refreshToken = signRefreshToken({ id: user.id });
+
+  const hashedRefresh = crypto.createHash('sha256').update(refreshToken).digest('hex');
+  await prisma.user.update({ where: { id: user.id }, data: { refreshToken: hashedRefresh } });
+
+  const { passwordHash: _, refreshToken: __, ...safeUser } = user;
+  return { user: { ...safeUser, role: effectiveRole(user) }, token, refreshToken };
 }
 
-export async function refresh(refreshToken) {
-  let payload;
-  try {
-    payload = verifyRefreshToken(refreshToken);
-  } catch {
-    const err = new Error("Invalid or expired refresh token");
-    err.status = 401;
-    throw err;
-  }
+async function refreshToken(refreshToken) {
+  const decoded = verifyRefreshToken(refreshToken);
+  if (!decoded) throw new AppError('Invalid or expired refresh token', 401);
 
-  const user = await prisma.user.findUnique({ where: { id: payload.sub } });
-  if (!user) {
-    const err = new Error("User no longer exists");
-    err.status = 401;
-    throw err;
-  }
+  const user = await prisma.user.findUnique({ where: { id: decoded.id } });
+  if (!user || !user.refreshToken) throw new AppError('Session expired', 401);
 
-  const accessToken = signAccessToken({ sub: user.id, email: user.email });
-  return { accessToken };
+  const hashedIncoming = crypto.createHash('sha256').update(refreshToken).digest('hex');
+  if (hashedIncoming !== user.refreshToken) throw new AppError('Refresh token mismatch', 401);
+
+  const accessToken = signToken({ id: user.id, rollNumber: user.rollNumber, role: effectiveRole(user) });
+  const newRefreshToken = signRefreshToken({ id: user.id });
+  const hashedRefresh = crypto.createHash('sha256').update(newRefreshToken).digest('hex');
+  await prisma.user.update({ where: { id: user.id }, data: { refreshToken: hashedRefresh } });
+
+  return { accessToken, refreshToken: newRefreshToken };
 }
+
+async function logout(userId) {
+  await prisma.user.update({ where: { id: userId }, data: { refreshToken: null } });
+}
+
+async function updateProfile(id, { name, class: cls, section, height, dateOfBirth, hasVisionProblem, hasHearingProblem }) {
+  const data = {};
+  if (name !== undefined) data.name = name;
+  if (cls !== undefined) data.class = cls !== null ? parseInt(cls) : null;
+  if (section !== undefined) data.section = section;
+  if (height !== undefined) data.height = height !== null ? parseFloat(height) : null;
+  if (dateOfBirth !== undefined) data.dateOfBirth = dateOfBirth ? new Date(dateOfBirth) : null;
+  if (hasVisionProblem !== undefined) data.hasVisionProblem = !!hasVisionProblem;
+  if (hasHearingProblem !== undefined) data.hasHearingProblem = !!hasHearingProblem;
+
+  const user = await prisma.user.update({
+    where: { id },
+    data,
+    select: {
+      id: true, rollNumber: true, name: true, role: true,
+      class: true, section: true, height: true, dateOfBirth: true,
+      hasVisionProblem: true, hasHearingProblem: true,
+      isCaptain: true, strikeCount: true, settings: true, createdAt: true,
+    },
+  });
+
+  if (!user) throw new AppError('User not found', 404);
+  return { ...user, role: effectiveRole(user) };
+}
+
+async function getUserById(id) {
+  const user = await prisma.user.findUnique({
+    where: { id },
+    select: {
+      id: true, rollNumber: true, name: true, role: true,
+      class: true, section: true, height: true, dateOfBirth: true,
+      hasVisionProblem: true, hasHearingProblem: true,
+      isCaptain: true, strikeCount: true, settings: true, createdAt: true,
+    },
+  });
+  if (!user) throw new AppError('User not found', 404);
+  return { ...user, role: effectiveRole(user) };
+}
+
+async function getSettings(userId) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { settings: true },
+  });
+  if (!user) throw new AppError('User not found', 404);
+  return user.settings || {};
+}
+
+async function updateSettings(userId, settings) {
+  const user = await prisma.user.update({
+    where: { id: userId },
+    data: { settings },
+    select: { id: true, settings: true },
+  });
+  return user.settings;
+}
+
+module.exports = { register, login, refreshToken, logout, getProfile: getUserById, getUserById, updateProfile, getSettings, updateSettings, encryptIdentity };

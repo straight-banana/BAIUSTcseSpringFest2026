@@ -1,12 +1,15 @@
-import { logger } from "../utils/logger.js";
+'use strict';
 
-// Minimal request logger. Swap for morgan if you want more detail/format
-// options — this exists so app.js has somewhere to mount request logging
-// without pulling in a dependency by default.
-export function requestLogger(req, res, next) {
-  const start = Date.now();
-  res.on("finish", () => {
-    logger.info(`${req.method} ${req.originalUrl} ${res.statusCode} ${Date.now() - start}ms`);
-  });
+const { logger } = require('../utils/logger');
+
+/**
+ * Logs each incoming HTTP request with method, URL, and response time.
+ * Complements morgan (which logs the request line), but this one
+ * logs at the application level via winston.
+ */
+function requestLogger(req, _res, next) {
+  logger.http(`→ ${req.method} ${req.originalUrl}`);
   next();
 }
+
+module.exports = { requestLogger };

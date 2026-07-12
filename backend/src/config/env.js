@@ -1,29 +1,34 @@
-import "dotenv/config";
+'use strict';
 
-// Reads and validates process.env once, at startup, so a missing var fails
-// fast instead of surfacing as a confusing error three layers deep.
-const required = ["DATABASE_URL", "JWT_ACCESS_SECRET", "JWT_REFRESH_SECRET"];
+/**
+ * Reads + validates required environment variables.
+ * Throws on startup if any required var is missing.
+ */
 
-for (const key of required) {
-  if (!process.env[key]) {
-    throw new Error(`Missing required env var: ${key} (see backend/.env.example)`);
+const REQUIRED_VARS = [
+  'DATABASE_URL',
+  'JWT_SECRET',
+];
+
+function validateEnv() {
+  const missing = REQUIRED_VARS.filter((key) => !process.env[key]);
+  if (missing.length > 0) {
+    throw new Error(
+      `❌ Missing required environment variables: ${missing.join(', ')}\n` +
+        `   Copy .env.example → .env and fill in the values.`
+    );
   }
 }
 
-export const env = {
-  port: process.env.PORT || 4000,
-  databaseUrl: process.env.DATABASE_URL,
-  jwt: {
-    accessSecret: process.env.JWT_ACCESS_SECRET,
-    refreshSecret: process.env.JWT_REFRESH_SECRET,
-    accessExpiresIn: process.env.JWT_ACCESS_EXPIRES_IN || "15m",
-    refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || "7d",
-  },
-  ai: {
-    customUrl: process.env.CUSTOM_AI_API_URL,
-    customKey: process.env.CUSTOM_AI_API_KEY,
-    opensourceUrl: process.env.OPENSOURCE_AI_API_URL,
-    opensourceKey: process.env.OPENSOURCE_AI_API_KEY,
-  },
-  corsOrigin: process.env.CORS_ORIGIN || "http://localhost:5173",
+const env = {
+  PORT: parseInt(process.env.PORT || '5000', 10),
+  NODE_ENV: process.env.NODE_ENV || 'development',
+  DATABASE_URL: process.env.DATABASE_URL,
+  JWT_SECRET: process.env.JWT_SECRET,
+  JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || '7d',
+  FRONTEND_URL: process.env.FRONTEND_URL || 'http://localhost:3000',
+  MAX_FILE_SIZE_MB: parseInt(process.env.MAX_FILE_SIZE_MB || '5', 10),
+  UPLOAD_DIR: process.env.UPLOAD_DIR || 'uploads',
 };
+
+module.exports = { env, validateEnv };

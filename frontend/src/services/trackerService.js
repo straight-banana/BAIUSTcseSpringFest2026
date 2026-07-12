@@ -8,4 +8,5 @@ export const addTrackerEntry = ({ type, amount, description }) =>
 export const listTrackerEntries = () => api.get('/tracker').then((r) => r.data);
 export const getTrackerEntry = (id) => api.get(`/tracker/${id}`).then((r) => r.data);
 export const getTrackerSummary = () => api.get('/tracker/summary').then((r) => r.data);
+export const getTodayMenu = () => api.get('/tracker/menu').then((r) => r.data);
 export const deleteTrackerEntry = (id) => api.del(`/tracker/${id}`).then((r) => r.data);

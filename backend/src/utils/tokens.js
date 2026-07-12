@@ -1,18 +1,32 @@
-import jwt from "jsonwebtoken";
-import { env } from "../config/env.js";
+'use strict';
 
-export function signAccessToken(payload) {
-  return jwt.sign(payload, env.jwt.accessSecret, { expiresIn: env.jwt.accessExpiresIn });
+const jwt = require('jsonwebtoken');
+const { env } = require('../config/env');
+
+function signToken(payload) {
+  return jwt.sign(payload, env.JWT_SECRET, { expiresIn: env.JWT_EXPIRES_IN || '7d' });
 }
 
-export function signRefreshToken(payload) {
-  return jwt.sign(payload, env.jwt.refreshSecret, { expiresIn: env.jwt.refreshExpiresIn });
+function verifyToken(token) {
+  try {
+    return jwt.verify(token, env.JWT_SECRET);
+  } catch {
+    return null;
+  }
 }
 
-export function verifyAccessToken(token) {
-  return jwt.verify(token, env.jwt.accessSecret);
+function signRefreshToken(payload) {
+  const secret = process.env.REFRESH_TOKEN_SECRET || env.JWT_SECRET + '_refresh';
+  return jwt.sign(payload, secret, { expiresIn: '30d' });
 }
 
-export function verifyRefreshToken(token) {
-  return jwt.verify(token, env.jwt.refreshSecret);
+function verifyRefreshToken(token) {
+  try {
+    const secret = process.env.REFRESH_TOKEN_SECRET || env.JWT_SECRET + '_refresh';
+    return jwt.verify(token, secret);
+  } catch {
+    return null;
+  }
 }
+
+module.exports = { signToken, verifyToken, signRefreshToken, verifyRefreshToken };

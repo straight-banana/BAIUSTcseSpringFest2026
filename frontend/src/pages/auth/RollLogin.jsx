@@ -42,8 +42,7 @@ export default function RollLogin() {
     const composedRoll = isTeacher
       ? teacherId.trim()
       : `${className}${section}-${rollNumber.trim()}`;
-    // Teacher role maps to the "office" access tier in the auth context.
-    const authRole = isTeacher ? 'office' : role;
+    const authRole = role;
     const res = await signIn({ rollNumber: composedRoll, password, role: authRole });
     setLoading(false);
     if (!res.success) { setError(res.error || 'Login failed'); return; }

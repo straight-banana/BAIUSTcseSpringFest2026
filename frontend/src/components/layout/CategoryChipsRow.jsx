@@ -10,7 +10,7 @@ import { prefetchRoute } from '../../routes/prefetch.js';
 export default function CategoryChipsRow() {
   const { role } = useAuth();
   const { pathname } = useLocation();
-  const navRole = role === 'teacher' ? 'office' : role;
+  const navRole = role;
   const NAV = NAV_BY_ROLE[navRole] || NAV_BY_ROLE.student;
 
   const items = NAV.flatMap((g) => g.items);

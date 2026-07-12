@@ -13,9 +13,8 @@ import AnonymousNotice from '../../components/mission1/AnonymousNotice.jsx';
 import EvidenceUpload from '../../components/mission1/EvidenceUpload.jsx';
 import ConfirmationDialog from '../../components/mission1/ConfirmationDialog.jsx';
 import { useToast } from '../../components/feedback/Toast.jsx';
-import {
-  CATEGORIES, COURSES, TEACHERS, CLASSROOMS, generateReferenceId,
-} from '../../mocks/data/complaints.js';
+import { CATEGORIES, COURSES, TEACHERS, CLASSROOMS } from '../../mocks/data/complaints.js';
+import { submitComplaint } from '../../services/complaintsService.js';
 import { ShieldAlert, Send, EyeOff } from 'lucide-react';
 
 const SUBJECT_MAX = 120;
@@ -44,21 +43,21 @@ export default function ComplaintSubmit() {
   });
   const [files, setFiles] = useState([]);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
 
-  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
-
-  // When the course name is picked, auto-fill the code (still editable).
-  const pickCourse = (name) => {
-    const match = COURSES.find((c) => c.name === name);
-    setForm((f) => ({ ...f, course: name, courseCode: match?.code || f.courseCode }));
+  const setField = (key, value) => setForm((prev) => ({ ...prev, [key]: value }));
+  const pickCourse = (value) => {
+    const selection = COURSES.find((option) => option.name === value);
+    setField('course', value);
+    setField('courseCode', selection ? selection.code : '');
   };
 
   const errors = useMemo(() => {
     const e = {};
-    if (!form.category) e.category = 'Choose a category';
-    if (form.subject.length > SUBJECT_MAX) e.subject = `Max ${SUBJECT_MAX} characters`;
-    if (!form.description.trim() || form.description.trim().length < 20)
-      e.description = 'Describe the incident in at least 20 characters';
+    if (!form.category) e.category = 'Category is required';
+    if (!form.description.trim()) e.description = 'Description is required';
+    else if (form.description.length < 20) e.description = 'Describe the incident in at least 20 characters';
     else if (form.description.length > DESC_MAX) e.description = `Max ${DESC_MAX} characters`;
     if (!form.course.trim()) e.course = 'Course name required';
     if (!form.courseCode.trim()) e.courseCode = 'Course code required';
@@ -70,13 +69,25 @@ export default function ComplaintSubmit() {
 
   const valid = Object.keys(errors).length === 0;
 
-  const submit = () => {
+  const submit = async () => {
     setConfirmOpen(false);
-    const ref = generateReferenceId();
-    toast.push({ tone: 'success', title: 'Complaint submitted', message: ref });
-    nav('/mission-1/submitted', {
-      state: { referenceId: ref, category: form.category, anonymous: form.anonymous },
-    });
+    setError('');
+    setSubmitting(true);
+    try {
+      const result = await submitComplaint({
+        ...form,
+        image: files[0],
+      });
+      toast.push({ tone: 'success', title: 'Complaint submitted', message: 'Your report has been sent.' });
+      nav('/mission-1/submitted', {
+        state: { referenceId: result.referenceCode, category: form.category, anonymous: form.anonymous },
+      });
+    } catch (err) {
+      setError(err?.message || 'Submission failed');
+      toast.push({ tone: 'error', title: 'Submission failed', message: err?.message || 'Try again later.' });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -102,7 +113,7 @@ export default function ComplaintSubmit() {
               label="Complaint category *"
               name="category"
               value={form.category}
-              onChange={(e) => set('category', e.target.value)}
+              onChange={(e) => setField('category', e.target.value)}
               error={errors.category}
               aria-required="true"
             >
@@ -118,7 +129,7 @@ export default function ComplaintSubmit() {
                 name="subject"
                 placeholder="Short headline — helps reviewers scan quickly"
                 value={form.subject}
-                onChange={(e) => set('subject', e.target.value.slice(0, SUBJECT_MAX))}
+                onChange={(e) => setField('subject', e.target.value.slice(0, SUBJECT_MAX))}
                 error={errors.subject}
                 maxLength={SUBJECT_MAX}
               />
@@ -134,7 +145,7 @@ export default function ComplaintSubmit() {
                 rows={7}
                 placeholder="What happened? When? Any witnesses? Do not include names of victims."
                 value={form.description}
-                onChange={(e) => set('description', e.target.value.slice(0, DESC_MAX))}
+                onChange={(e) => setField('description', e.target.value.slice(0, DESC_MAX))}
                 error={errors.description}
                 aria-required="true"
               />
@@ -164,13 +175,13 @@ export default function ComplaintSubmit() {
                 label="Course code *"
                 placeholder="e.g. CSE 2101"
                 value={form.courseCode}
-                onChange={(e) => set('courseCode', e.target.value)}
+                onChange={(e) => setField('courseCode', e.target.value)}
                 error={errors.courseCode}
               />
               <Select
                 label="Teacher (optional)"
                 value={form.teacher}
-                onChange={(e) => set('teacher', e.target.value)}
+                onChange={(e) => setField('teacher', e.target.value)}
               >
                 <option value="">Prefer not to say</option>
                 {TEACHERS.map((t) => <option key={t} value={t}>{t}</option>)}
@@ -178,7 +189,7 @@ export default function ComplaintSubmit() {
               <Select
                 label="Classroom *"
                 value={form.classroom}
-                onChange={(e) => set('classroom', e.target.value)}
+                onChange={(e) => setField('classroom', e.target.value)}
                 error={errors.classroom}
               >
                 <option value="">Select classroom…</option>
@@ -188,14 +199,14 @@ export default function ComplaintSubmit() {
                 label="Date *"
                 type="date"
                 value={form.incidentDate}
-                onChange={(e) => set('incidentDate', e.target.value)}
+                onChange={(e) => setField('incidentDate', e.target.value)}
                 error={errors.incidentDate}
               />
               <Input
                 label="Time *"
                 type="time"
                 value={form.incidentTime}
-                onChange={(e) => set('incidentTime', e.target.value)}
+                onChange={(e) => setField('incidentTime', e.target.value)}
                 error={errors.incidentTime}
               />
             </div>
@@ -222,17 +233,18 @@ export default function ComplaintSubmit() {
             <Switch
               label="Submit anonymously (recommended)"
               checked={form.anonymous}
-              onChange={(v) => set('anonymous', v)}
+              onChange={(v) => setField('anonymous', v)}
             />
             <div className="flex gap-2 ml-auto">
               <Button variant="ghost" type="button" onClick={() => nav('/mission-1')}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={!valid} leftIcon={<Send size={14} />}>
-                Submit Complaint
+              <Button type="submit" disabled={!valid || submitting} leftIcon={<Send size={14} />}>
+                {submitting ? 'Submitting...' : 'Submit Complaint'}
               </Button>
             </div>
           </Card>
+          {error && <p className="text-sm text-danger">{error}</p>}
         </form>
 
         <aside className="space-y-4">

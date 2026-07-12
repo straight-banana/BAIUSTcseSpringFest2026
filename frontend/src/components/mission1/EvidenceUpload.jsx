@@ -18,6 +18,7 @@ export default function EvidenceUpload({ files, onChange }) {
       type: f.type,
       preview: f.type.startsWith('image/') ? URL.createObjectURL(f) : null,
       progress: 100, // fake — UI only
+      file: f,
     }));
     onChange([...(files || []), ...incoming]);
   };

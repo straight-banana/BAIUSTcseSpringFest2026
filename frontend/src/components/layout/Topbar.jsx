@@ -86,6 +86,14 @@ export default function Topbar({ onOpenSidebar, liveCount = 0 }) {
         </div>
 
         <div className="flex items-center gap-2">
+          <button
+            onClick={onOpenSidebar}
+            aria-label="Open navigation"
+            className="lg:hidden h-9 w-9 border border-[rgb(var(--chrome-fg))]/30 text-[rgb(var(--chrome-fg))]/90 hover:text-[rgb(var(--chrome-fg))] hover:bg-[rgb(var(--chrome-fg))]/8 flex items-center justify-center rounded-sm"
+          >
+            <Menu size={15} />
+          </button>
+
           <label className="hidden md:flex items-center gap-2 w-72 h-9 px-3 border border-[rgb(var(--chrome-fg))]/30 bg-[rgb(var(--chrome-fg))]/8 text-sm text-[rgb(var(--chrome-fg))]/90 rounded-sm focus-within:border-white focus-within:bg-[rgb(var(--chrome-fg))]/10">
             <Search size={14} />
             <input

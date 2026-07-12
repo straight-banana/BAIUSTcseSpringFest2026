@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Search, Filter, History, ChevronLeft, ChevronRight } from 'lucide-react';
 import PageContainer from '../../components/layout/PageContainer.jsx';
 import PageHeader from '../../components/layout/PageHeader.jsx';
@@ -10,6 +10,7 @@ import AlertDrawer from '../../components/mission5/AlertDrawer.jsx';
 import SosStatusBadge from '../../components/mission5/SosStatusBadge.jsx';
 import SeverityBadge from '../../components/mission5/SeverityBadge.jsx';
 import { CURRENT_STUDENT_HISTORY, LOCATIONS, STATUSES, findLocation, findType } from '../../mocks/data/mission5.js';
+import { listAllSos } from '../../services/sosService.js';
 
 const PAGE = 8;
 
@@ -19,17 +20,42 @@ export default function SosHistory() {
   const [status, setStatus] = useState('all');
   const [page, setPage] = useState(1);
   const [drawer, setDrawer] = useState(null);
+  const [alerts, setAlerts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let active = true;
+    listAllSos()
+      .then((data) => {
+        if (!active) return;
+        setAlerts(Array.isArray(data) ? data : data.alerts || []);
+      })
+      .catch((err) => {
+        if (!active) return;
+        setError(err?.message || 'Unable to load alerts');
+        setAlerts([]);
+      })
+      .finally(() => {
+        if (!active) return;
+        setLoading(false);
+      });
+    return () => { active = false; };
+  }, []);
 
   const list = useMemo(() => {
-    // Pad with mock data to have more rows
-    const combined = [...CURRENT_STUDENT_HISTORY, ...CURRENT_STUDENT_HISTORY.map((a, i) => ({ ...a, id: a.id + '-B' + i }))];
+    const fallback = CURRENT_STUDENT_HISTORY.map((alert, index) => ({
+      ...alert,
+      id: `${alert.id}-B${index}`,
+    }));
+    const combined = alerts.length > 0 ? alerts : [...CURRENT_STUDENT_HISTORY, ...fallback];
     return combined.filter((a) => {
       if (loc !== 'all' && a.location !== loc) return false;
       if (status !== 'all' && a.status !== status) return false;
       if (q && !(`${a.id} ${a.description}`.toLowerCase().includes(q.toLowerCase()))) return false;
       return true;
     });
-  }, [q, loc, status]);
+  }, [q, loc, status, alerts]);
 
   const totalPages = Math.max(1, Math.ceil(list.length / PAGE));
   const rows = list.slice((page - 1) * PAGE, page * PAGE);

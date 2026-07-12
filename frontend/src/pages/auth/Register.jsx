@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Hash, ArrowRight, Loader2, Lock, User, GraduationCap, Users, Info } from 'lucide-react';
+import { Hash, ArrowRight, Loader2, Lock, User, GraduationCap, Users, Info, Ruler, Eye, Ear } from 'lucide-react';
 import AuthShell from '../../components/auth/AuthShell.jsx';
 import LoginCard from '../../components/auth/LoginCard.jsx';
 import FormField from '../../components/forms/FormField.jsx';
@@ -9,6 +9,11 @@ import { useAuth } from '../../context/AuthContext.jsx';
 
 const CLASSES = ['6', '7', '8', '9', '10'];
 const SECTIONS = ['A', 'B', 'C', 'D'];
+const IMPAIRMENT = [
+  { value: 'None', label: 'None' },
+  { value: 'Mild', label: 'Mild' },
+  { value: 'Severe', label: 'Severe' },
+];
 
 export default function Register() {
   const nav = useNavigate();
@@ -21,15 +26,24 @@ export default function Register() {
   const [rollNumber, setRoll] = useState('');
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
+  const [height, setHeight] = useState('');
+  const [vision, setVision] = useState('None');
+  const [hearing, setHearing] = useState('None');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  useEffect(() => { setError(''); }, [rollNumber, name, password, className, section]);
+  useEffect(() => { setError(''); }, [rollNumber, name, password, className, section, height, vision, hearing]);
+
+  const heightNum = Number(height);
+  const heightValid = height !== '' && Number.isFinite(heightNum) && heightNum >= 80 && heightNum <= 250;
 
   const canSubmit =
     rollNumber.trim().length >= 1 &&
     name.trim().length >= 1 &&
     password.length >= 6 &&
+    heightValid &&
+    !!vision &&
+    !!hearing &&
     !loading;
 
   const submit = async (e) => {
@@ -44,6 +58,9 @@ export default function Register() {
       role,
       className,
       section,
+      height: heightNum,
+      vision,
+      hearing,
     });
     setLoading(false);
     if (!res.success) { setError(res.error || 'Registration failed'); return; }
@@ -90,6 +107,7 @@ export default function Register() {
             value={rollNumber}
             onChange={(e) => setRoll(e.target.value)}
             leadingIcon={<Hash size={14} />}
+            required
           />
           <FormField
             label="Full Name"
@@ -98,7 +116,38 @@ export default function Register() {
             value={name}
             onChange={(e) => setName(e.target.value)}
             leadingIcon={<User size={14} />}
+            required
           />
+          <FormField
+            label="Height (cm)"
+            name="height"
+            type="number"
+            min={80}
+            max={250}
+            placeholder="e.g. 160"
+            value={height}
+            onChange={(e) => setHeight(e.target.value)}
+            leadingIcon={<Ruler size={14} />}
+            state={height !== '' && !heightValid ? 'error' : 'default'}
+            message={height !== '' && !heightValid ? 'Enter a height between 80 and 250 cm' : ''}
+            required
+          />
+          <div className="grid grid-cols-2 gap-3">
+            <SelectField
+              label="Eyesight"
+              value={vision}
+              onChange={(e) => setVision(e.target.value)}
+              icon={<Eye size={14} />}
+              options={IMPAIRMENT}
+            />
+            <SelectField
+              label="Hearing"
+              value={hearing}
+              onChange={(e) => setHearing(e.target.value)}
+              icon={<Ear size={14} />}
+              options={IMPAIRMENT}
+            />
+          </div>
           <FormField
             label="Password"
             name="password"
@@ -109,6 +158,8 @@ export default function Register() {
             leadingIcon={<Lock size={14} />}
             state={error ? 'error' : 'default'}
             message={error || ''}
+            required
+            minLength={6}
           />
           <motion.button
             whileTap={{ scale: canSubmit ? 0.98 : 1 }}

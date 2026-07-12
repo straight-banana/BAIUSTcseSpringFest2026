@@ -1,21 +1,62 @@
-import { verifyAccessToken } from "../utils/tokens.js";
-import { errorResponse } from "../utils/apiResponse.js";
+'use strict';
 
-// Verifies the `Authorization: Bearer <token>` header and attaches the
-// decoded payload to req.user. Every protected route mounts this first —
-// controllers can assume req.user exists once it's passed.
-export function auth(req, res, next) {
-  const header = req.headers.authorization;
-  const token = header?.startsWith("Bearer ") ? header.slice(7) : null;
+const prisma = require('../config/prisma');
+const { verifyToken } = require('../utils/tokens');
+const { errorResponse } = require('../utils/apiResponse');
+const { blacklist } = require('./tokenBlacklist');
 
-  if (!token) {
-    return res.status(401).json(errorResponse("Missing or malformed Authorization header"));
-  }
+/**
+ * Advanced auth middleware.
+ * Usage: 
+ *   auth() -> requires valid token
+ *   auth({ optional: true }) -> decodes if present, no error if missing
+ *   auth({ roles: ['ADMIN', 'CAPTAIN'] }) -> requires valid token AND specific role
+ */
+function auth(options = {}) {
+  const { optional = false, roles = [] } = options;
 
-  try {
-    req.user = verifyAccessToken(token);
+  return async (req, res, next) => {
+    const authHeader = req.headers['authorization'];
+    
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      if (optional) return next();
+      return res.status(401).json(errorResponse('No token provided', 401));
+    }
+
+    const token = authHeader.split(' ')[1];
+
+    if (blacklist.has(token)) {
+      if (optional) return next();
+      return res.status(401).json(errorResponse('Token has been revoked', 401));
+    }
+
+    const decoded = verifyToken(token);
+    if (!decoded) {
+      if (optional) return next();
+      return res.status(401).json(errorResponse('Invalid or expired token', 401));
+    }
+
+    req.user = decoded;
+    req.token = token;
+
+    const dbUser = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      select: { id: true, role: true, isCaptain: true },
+    });
+
+    if (!dbUser) {
+      return res.status(401).json(errorResponse('User not found', 401));
+    }
+
+    const effectiveRole = dbUser.isCaptain ? 'CAPTAIN' : dbUser.role;
+    req.user = { ...req.user, dbRole: dbUser.role, isCaptain: dbUser.isCaptain, role: effectiveRole };
+
+    if (roles.length > 0 && !roles.includes(req.user.role)) {
+      return res.status(403).json(errorResponse(`Requires role: ${roles.join(' or ')}`, 403));
+    }
+
     next();
-  } catch {
-    return res.status(401).json(errorResponse("Invalid or expired token"));
-  }
+  };
 }
+
+module.exports = auth;

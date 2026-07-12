@@ -1,6 +1,15 @@
-import { PrismaClient } from "@prisma/client";
+'use strict';
 
-// One Prisma client for the whole process. Import this everywhere instead
-// of instantiating `new PrismaClient()` per file — avoids exhausting the
-// Postgres connection pool in dev (hot reload) and in serverless hosts.
-export const prisma = new PrismaClient();
+require('dotenv').config();
+const { PrismaClient } = require('@prisma/client');
+
+/**
+ * Singleton Prisma client — import this everywhere instead of
+ * calling `new PrismaClient()` directly.
+ */
+const prisma = new PrismaClient({
+  log: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
+});
+
+module.exports = prisma;
+

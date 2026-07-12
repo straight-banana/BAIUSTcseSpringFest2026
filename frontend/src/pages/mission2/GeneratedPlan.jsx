@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import PageContainer from '../../components/layout/PageContainer.jsx';
 import PageHeader from '../../components/layout/PageHeader.jsx';
 import Mission2SubNav from '../../components/mission2/Mission2SubNav.jsx';
@@ -12,13 +12,44 @@ import ConstraintBadge from '../../components/mission2/ConstraintBadge.jsx';
 import { useToast } from '../../components/feedback/Toast.jsx';
 import { Sparkles, Printer, Download, Save, Eye, Ear, ArrowUpToLine, Users } from 'lucide-react';
 import { CLASSROOM_SIZES, buildSeatingPlan, STUDENTS, SUMMARY } from '../../mocks/data/mission2.js';
+import { getLatestPlan } from '../../services/seatsService.js';
 
 export default function GeneratedPlan() {
   const toast = useToast();
   const size = CLASSROOM_SIZES[2]; // 7x8
   const [seed, setSeed] = useState(0);
-  const seats = useMemo(() => buildSeatingPlan(size.rows, size.cols, [...STUDENTS].reverse().slice(0, 34)), [size, seed]);
+  const [plan, setPlan] = useState(null);
+  const [loadingPlan, setLoadingPlan] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [selected, setSelected] = useState(null);
+  const seats = useMemo(() => {
+    if (plan?.seats) {
+      return plan.seats.map((seat) => ({
+        ...seat,
+        id: seat.id,
+        label: `${String.fromCharCode(65 + seat.row)}${seat.col + 1}`,
+        student: seat.name ? { name: seat.name, roll: seat.rollNumber, height: seat.height } : null,
+      }));
+    }
+    return buildSeatingPlan(size.rows, size.cols, [...STUDENTS].reverse().slice(0, 34));
+  }, [plan, size, seed]);
+
+  useEffect(() => {
+    let active = true;
+    getLatestPlan()
+      .then((latest) => {
+        if (!active) return;
+        setPlan(latest);
+      })
+      .catch((err) => {
+        if (!active) return;
+        setLoadError(err?.message || 'Unable to load latest plan');
+      })
+      .finally(() => {
+        if (active) setLoadingPlan(false);
+      });
+    return () => { active = false; };
+  }, []);
 
   return (
     <PageContainer>
@@ -46,8 +77,8 @@ export default function GeneratedPlan() {
       <div className="grid grid-cols-1 xl:grid-cols-[1fr_300px] gap-4 mt-4">
         <ClassroomGrid
           seats={seats}
-          rows={size.rows}
-          cols={size.cols}
+          rows={plan?.gridRows ?? size.rows}
+          cols={plan?.gridCols ?? size.cols}
           selectedId={selected?.id}
           onSeatClick={setSelected}
         />
