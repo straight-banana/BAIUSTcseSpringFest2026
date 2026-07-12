@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import Card from '../common/Card.jsx';
 import SectionHeader from '../ui/SectionHeader.jsx';
-import { RATES } from '../../mocks/data/mission4.js';
 import { ArrowRightLeft } from 'lucide-react';
+
+const RATES = { BDT: 1, USD: 0.0085, EUR: 0.0078, GBP: 0.0068 };
 
 export default function CurrencyWidget({ initialAmount = 1000 }) {
   const [amount, setAmount] = useState(initialAmount);
   const [to, setTo] = useState('USD');
-  const converted = (amount * RATES[to]).toFixed(2);
+  const converted = (amount * (RATES[to] || 0)).toFixed(2);
 
   return (
     <Card className="p-5">

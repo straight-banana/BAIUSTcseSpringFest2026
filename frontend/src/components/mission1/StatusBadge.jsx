@@ -1,7 +1,7 @@
 import Badge from '../ui/Badge.jsx';
-import { findStatus } from '../../mocks/data/complaints.js';
+import { normalizeComplaintStatus } from '../../utils/missionApiMaps.js';
 
 export default function StatusBadge({ status }) {
-  const s = findStatus(status);
+  const s = normalizeComplaintStatus(status);
   return <Badge tone={s.tone}>{s.label}</Badge>;
 }

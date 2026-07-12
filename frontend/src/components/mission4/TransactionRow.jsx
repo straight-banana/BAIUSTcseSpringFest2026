@@ -1,7 +1,7 @@
 import { memo } from 'react';
 import CategoryBadge from './CategoryBadge.jsx';
 import StatusPill from './StatusPill.jsx';
-import { formatBDT } from '../../mocks/data/mission4.js';
+import { formatBDT } from '../../utils/missionApiMaps.js';
 import { MoreHorizontal, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext.jsx';
 

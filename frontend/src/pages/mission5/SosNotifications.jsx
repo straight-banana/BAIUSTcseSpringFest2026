@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Bell, Check, CheckCheck } from 'lucide-react';
 import PageContainer from '../../components/layout/PageContainer.jsx';
 import PageHeader from '../../components/layout/PageHeader.jsx';
@@ -7,13 +7,30 @@ import Button from '../../components/common/Button.jsx';
 import Badge from '../../components/ui/Badge.jsx';
 import SectionHeader from '../../components/ui/SectionHeader.jsx';
 import Mission5SubNav from '../../components/mission5/Mission5SubNav.jsx';
-import { NOTIFICATIONS } from '../../mocks/data/mission5.js';
+import { listAllSos } from '../../services/sosService.js';
+import { mapSosAlertFromApi } from '../../utils/missionApiMaps.js';
 
 const iconFor = { new: '🚨', accepted: '✅', resolved: '🎉', closed: '📁' };
 
 export default function SosNotifications() {
-  const [items, setItems] = useState(NOTIFICATIONS);
+  const [items, setItems] = useState([]);
   const unread = items.filter((n) => !n.read).length;
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const res = await listAllSos();
+        if (!alive) return;
+        const alerts = (res?.data?.alerts || res?.alerts || []).map(mapSosAlertFromApi).filter(Boolean).slice(0, 12);
+        const notes = alerts.map((a) => ({ id: a.id, title: a.description, body: `${a.type} · ${a.location}`, when: new Date(a.time).toLocaleString(), tone: 'brand', kind: 'sos', read: false }));
+        setItems(notes);
+      } catch {
+        if (alive) setItems([]);
+      }
+    })();
+    return () => { alive = false; };
+  }, []);
 
   const markAll = () => setItems((xs) => xs.map((n) => ({ ...n, read: true })));
   const toggle = (id) => setItems((xs) => xs.map((n) => n.id === id ? { ...n, read: !n.read } : n));

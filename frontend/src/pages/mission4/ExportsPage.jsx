@@ -6,7 +6,9 @@ import Button from '../../components/common/Button.jsx';
 import SectionHeader from '../../components/ui/SectionHeader.jsx';
 import Badge from '../../components/ui/Badge.jsx';
 import Mission4SubNav from '../../components/mission4/Mission4SubNav.jsx';
-import { NOTIFICATIONS } from '../../mocks/data/mission4.js';
+import { useEffect, useState } from 'react';
+import { listTrackerEntries } from '../../services/trackerService.js';
+import { mapTrackerEntryFromApi, formatBDT } from '../../utils/missionApiMaps.js';
 
 const options = [
   { icon: <FileText size={18} />,         title: 'Export PDF',            desc: 'Formatted ledger with charts' },
@@ -18,6 +20,33 @@ const options = [
 ];
 
 export default function ExportsPage() {
+  const [notes, setNotes] = useState([]);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const res = await listTrackerEntries();
+        if (!alive) return;
+        const items = (res?.data || res || []).slice(-6).reverse().map((t) => {
+          const m = mapTrackerEntryFromApi(t);
+          return {
+            id: m.id,
+            title: m.description,
+            body: `${m.addedBy} · ${formatBDT(m.amount)}`,
+            when: new Date(m.date || Date.now()).toLocaleString(),
+            tone: m.category === 'tiffin' ? 'warning' : 'neutral',
+            kind: 'transaction',
+          };
+        });
+        setNotes(items);
+      } catch {
+        if (alive) setNotes([]);
+      }
+    })();
+    return () => { alive = false; };
+  }, []);
+
   return (
     <PageContainer>
       <PageHeader
@@ -49,9 +78,9 @@ export default function ExportsPage() {
         </div>
 
         <Card className="p-5">
-          <SectionHeader title="Notifications" description="Recent finance activity" action={<Badge tone="brand">{NOTIFICATIONS.length}</Badge>} />
+          <SectionHeader title="Notifications" description="Recent finance activity" action={<Badge tone="brand">{notes.length}</Badge>} />
           <ul className="space-y-2">
-            {NOTIFICATIONS.map((n) => (
+            {notes.map((n) => (
               <li key={n.id} className="rounded-lg border border-border bg-surface p-3 flex gap-3">
                 <div className="h-8 w-8 rounded-md bg-brand-soft text-brand flex items-center justify-center shrink-0">
                   <BellRing size={14} />

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Coins, Plus, Wallet, ArrowUpRight, ArrowDownRight, Receipt, PieChart as PieIcon, Download, BarChart3, FileText, Utensils } from 'lucide-react';
@@ -13,7 +13,9 @@ import BudgetProgress from '../../components/mission4/BudgetProgress.jsx';
 import TransactionRow from '../../components/mission4/TransactionRow.jsx';
 import TransactionDrawer from '../../components/mission4/TransactionDrawer.jsx';
 import TransactionModal from '../../components/mission4/TransactionModal.jsx';
-import { SUMMARY, TRANSACTIONS, formatBDT } from '../../mocks/data/mission4.js';
+import { getTrackerSummary, listTrackerEntries, getBudgets, getMenu } from '../../services/trackerService.js';
+import { mapTrackerEntryFromApi } from '../../utils/missionApiMaps.js';
+import { formatBDT } from '../../utils/missionApiMaps.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 
 
@@ -23,8 +25,43 @@ export default function Mission4Overview() {
   const [drawerTx, setDrawerTx] = useState(null);
   const [modal, setModal] = useState(false);
   const [modalType, setModalType] = useState('expense');
+  const [summary, setSummary] = useState({ totalMoney: 0, totalFood: 0, grandTotal: 0, funAnalysis: {} });
+  const [transactions, setTransactions] = useState([]);
+  const [budgets, setBudgets] = useState([]);
+  const [menu, setMenu] = useState(null);
 
-  const recent = TRANSACTIONS.slice(0, 6);
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const [summaryRes, entriesRes, budgetsRes, menuRes] = await Promise.all([
+          getTrackerSummary(),
+          listTrackerEntries(),
+          getBudgets(),
+          getMenu(),
+        ]);
+        if (!alive) return;
+        const pageData = summaryRes?.data || summaryRes;
+        const entries = (entriesRes?.data?.entries || entriesRes?.entries || []).map(mapTrackerEntryFromApi).filter(Boolean);
+        setSummary(pageData || { totalMoney: 0, totalFood: 0, grandTotal: 0, funAnalysis: {} });
+        setTransactions(entries);
+        setBudgets(budgetsRes?.data || budgetsRes || []);
+        setMenu(menuRes?.data || menuRes || null);
+      } catch {
+        if (alive) {
+          setSummary({ totalMoney: 0, totalFood: 0, grandTotal: 0, funAnalysis: {} });
+          setTransactions([]);
+          setBudgets([]);
+          setMenu(null);
+        }
+      }
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  const recent = transactions.slice(0, 6);
+  const tiffinBudget = budgets.find((b) => b.type === 'TIFFIN')?.amount || 12000;
+  const tiffinSpent = summary.totalFood || 0;
 
   const openAdd = (t) => { setModalType(t); setModal(true); };
 
@@ -47,12 +84,12 @@ export default function Mission4Overview() {
 
       {/* Summary */}
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
-        <StatCard icon={<Wallet size={16} />} label="Current Balance" value={formatBDT(SUMMARY.balance)} hint="Live class balance" trend={4.2} />
-        <StatCard icon={<ArrowUpRight size={16} />} label="Total Income" value={formatBDT(SUMMARY.income)} hint="All time" trend={8.1} />
-        <StatCard icon={<ArrowDownRight size={16} />} label="Total Expenses" value={formatBDT(SUMMARY.expense)} hint="All time" trend={-2.4} />
-        <StatCard icon={<Receipt size={16} />} label="Transactions" value={SUMMARY.total} hint="Logged" />
-        <StatCard icon={<Utensils size={16} />} label="Tiffin Budget" value={formatBDT(SUMMARY.tiffinBudget)} hint="Monthly cap" />
-        <StatCard icon={<PieIcon size={16} />} label="Remaining" value={formatBDT(SUMMARY.tiffinBudget - SUMMARY.tiffinSpent)} hint="After tiffin" trend={-1.3} />
+        <StatCard icon={<Wallet size={16} />} label="Current Balance" value={formatBDT(summary.grandTotal)} hint="Live class balance" trend={4.2} />
+        <StatCard icon={<ArrowUpRight size={16} />} label="Total Income" value={formatBDT(summary.totalMoney)} hint="All time" trend={8.1} />
+        <StatCard icon={<ArrowDownRight size={16} />} label="Total Expenses" value={formatBDT(summary.totalFood)} hint="All time" trend={-2.4} />
+        <StatCard icon={<Receipt size={16} />} label="Transactions" value={transactions.length} hint="Logged" />
+        <StatCard icon={<Utensils size={16} />} label="Tiffin Budget" value={formatBDT(tiffinBudget)} hint="Monthly cap" />
+        <StatCard icon={<PieIcon size={16} />} label="Remaining" value={formatBDT(Math.max(0, tiffinBudget - tiffinSpent))} hint="After tiffin" trend={-1.3} />
       </div>
 
       {/* Budget progress + Quick actions */}
@@ -60,7 +97,7 @@ export default function Mission4Overview() {
         <Card className={`p-5 ${canEdit ? 'lg:col-span-2' : ''}`}>
           <SectionHeader title="Budget Overview" description="Where the class fund is going right now." />
           <div className="grid sm:grid-cols-2 gap-5">
-            <BudgetProgress label="Tiffin Budget" spent={SUMMARY.tiffinSpent} budget={SUMMARY.tiffinBudget} />
+            <BudgetProgress label="Tiffin Budget" spent={tiffinSpent} budget={tiffinBudget} />
             <BudgetProgress label="Event Fund" spent={4200} budget={8000} tone="success" />
             <BudgetProgress label="Stationery" spent={1800} budget={2500} />
             <BudgetProgress label="Emergency" spent={900} budget={3000} tone="success" />

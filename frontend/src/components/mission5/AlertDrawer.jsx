@@ -3,7 +3,7 @@ import { X, MapPin, Clock, User, ShieldCheck } from 'lucide-react';
 import Button from '../common/Button.jsx';
 import SosStatusBadge from './SosStatusBadge.jsx';
 import SeverityBadge from './SeverityBadge.jsx';
-import { findLocation, findType } from '../../mocks/data/mission5.js';
+import { MISSION5_LOCATIONS, MISSION5_TYPES } from '../../utils/missionApiMaps.js';
 
 export default function AlertDrawer({ alert, onClose, onAccept, onResolve }) {
   return (
@@ -40,14 +40,14 @@ export default function AlertDrawer({ alert, onClose, onAccept, onResolve }) {
               <div className="rounded-lg border border-border bg-surface p-4">
                 <div className="flex items-center justify-between">
                   <p className="text-lg font-semibold text-fg">
-                    {findType(alert.type).icon} {findType(alert.type).label}
-                  </p>
+                      {(MISSION5_TYPES.find(t => t.key === alert.type) || MISSION5_TYPES[0]).icon} {(MISSION5_TYPES.find(t => t.key === alert.type) || MISSION5_TYPES[0]).label}
+                    </p>
                   <SeverityBadge severity={alert.severity} />
                 </div>
                 <p className="text-sm text-muted mt-1">{alert.description}</p>
               </div>
 
-              <Row icon={<MapPin size={13} />} label="Location" value={`${findLocation(alert.location).icon} ${findLocation(alert.location).label}`} />
+              <Row icon={<MapPin size={13} />} label="Location" value={`${(MISSION5_LOCATIONS.find(l => l.key === alert.location) || MISSION5_LOCATIONS[0]).icon} ${(MISSION5_LOCATIONS.find(l => l.key === alert.location) || MISSION5_LOCATIONS[0]).label}`} />
               <Row icon={<Clock size={13} />}  label="Time" value={new Date(alert.time).toLocaleString()} />
               <Row icon={<User size={13} />}   label="Reported by" value={alert.student} />
               <Row icon={<ShieldCheck size={13} />} label="Captain" value={alert.captain || '— unassigned —'} />

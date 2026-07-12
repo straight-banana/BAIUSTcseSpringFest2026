@@ -5,11 +5,44 @@ import Card from '../../components/common/Card.jsx';
 import SectionHeader from '../../components/ui/SectionHeader.jsx';
 import ConstraintBadge from '../../components/mission2/ConstraintBadge.jsx';
 import ClassroomLegend from '../../components/mission2/ClassroomLegend.jsx';
-import { CONSTRAINT_TYPES, STUDENTS } from '../../mocks/data/mission2.js';
+import { getLatestPlan } from '../../services/seatsService.js';
+import { mapSeatPlanFromApi } from '../../utils/missionApiMaps.js';
+import { useEffect, useState } from 'react';
+
+const CONSTRAINT_TYPES = [
+  { id: 'vision', label: 'Vision support', desc: 'Place students with vision issues closer to the front' },
+  { id: 'hearing', label: 'Hearing support', desc: 'Place students with hearing issues near the teacher' },
+  { id: 'isolation', label: 'Isolation', desc: 'Seat apart for behavioral needs' },
+];
 import { Layers } from 'lucide-react';
 
 export default function Constraints() {
-  const rows = STUDENTS.filter((s) => s.vision !== 'None' || s.hearing !== 'None').slice(0, 12);
+  const [students, setStudents] = useState([]);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const res = await getLatestPlan();
+        if (!alive) return;
+        const plan = mapSeatPlanFromApi(res?.data || res);
+        const list = (plan?.seats || []).map((s) => ({
+          id: s.student?.id || s.id,
+          name: s.student?.name || 'Student',
+          roll: s.student?.rollNumber || s.student?.roll || '—',
+          vision: s.student?.hasVisionProblem ? 'Minor' : 'None',
+          hearing: s.student?.hasHearingProblem ? 'Minor' : 'None',
+          notes: s.student?.notes || '',
+        }));
+        setStudents(list);
+      } catch {
+        setStudents([]);
+      }
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  const rows = students.filter((s) => s.vision !== 'None' || s.hearing !== 'None').slice(0, 12);
 
   return (
     <PageContainer>

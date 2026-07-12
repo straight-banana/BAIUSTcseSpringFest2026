@@ -4,12 +4,11 @@ import { CheckCircle2, Home, Send, Clock, MapPin } from 'lucide-react';
 import PageContainer from '../../components/layout/PageContainer.jsx';
 import Card from '../../components/common/Card.jsx';
 import Button from '../../components/common/Button.jsx';
-import { findLocation, EMERGENCY_TIPS } from '../../mocks/data/mission5.js';
+import { MISSION5_TIPS as EMERGENCY_TIPS } from '../../utils/missionApiMaps.js';
 
 export default function SosSuccess() {
   const state = useLocation().state || {};
-  const loc = findLocation(state.location || 'classroom');
-  const id = `SOS-2026-${(2100 + Math.floor(Math.random() * 800)).toString()}`;
+  const id = state.alertId || `SOS-2026-${(2100 + Math.floor(Math.random() * 800)).toString()}`;
 
   return (
     <PageContainer>
@@ -28,7 +27,7 @@ export default function SosSuccess() {
 
           <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-3 text-left">
             <Info label="Alert ID" value={<span className="font-mono">{id}</span>} />
-            <Info label="Location" value={<><MapPin size={12} className="inline mr-1" /> {loc.icon} {loc.label}</>} />
+            <Info label="Location" value={<><MapPin size={12} className="inline mr-1" /> {state.location || 'Classroom'}</>} />
             <Info label="Response ETA" value={<><Clock size={12} className="inline mr-1" /> ~ 3 min</>} />
           </div>
 

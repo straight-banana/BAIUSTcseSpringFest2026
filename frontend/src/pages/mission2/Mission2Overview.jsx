@@ -1,3 +1,4 @@
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import PageContainer from '../../components/layout/PageContainer.jsx';
 import PageHeader from '../../components/layout/PageHeader.jsx';
@@ -8,13 +9,45 @@ import SectionHeader from '../../components/ui/SectionHeader.jsx';
 import { StatCard, FeatureCard } from '../../components/common/Cards.jsx';
 import ConstraintBadge from '../../components/mission2/ConstraintBadge.jsx';
 import { Grid3X3, Users, Sofa, LayoutGrid, Sparkles, Eye, Ear, ArrowUpToLine, Lock, Target, Plus, PlayCircle } from 'lucide-react';
-import { SUMMARY } from '../../mocks/data/mission2.js';
+import { getLatestPlan } from '../../services/seatsService.js';
+import { mapSeatPlanFromApi } from '../../utils/missionApiMaps.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 
 export default function Mission2Overview() {
   const { role } = useAuth();
   const isCaptain = role === 'captain';
   const canEdit = role === 'teacher' || role === 'office';
+  const [plan, setPlan] = useState(null);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const res = await getLatestPlan();
+        if (alive) setPlan(mapSeatPlanFromApi(res?.data || res));
+      } catch {
+        if (alive) setPlan(null);
+      }
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  const summary = useMemo(() => {
+    const seats = plan?.seats || [];
+    const capacity = Number(plan?.gridCols || 0) * Number(plan?.gridRows || 0);
+    const visionPriority = seats.filter((seat) => seat.hasVisionProblem).length;
+    const hearingPriority = seats.filter((seat) => seat.hasHearingProblem).length;
+    return {
+      totalStudents: seats.length,
+      capacity,
+      emptySeats: Math.max(0, capacity - seats.length),
+      generatedPlans: 1,
+      visionPriority,
+      hearingPriority,
+      reserved: 0,
+      frontRow: 0,
+    };
+  }, [plan]);
 
   return (
     <PageContainer>
@@ -34,21 +67,21 @@ export default function Mission2Overview() {
       <Mission2SubNav />
 
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        <StatCard icon={<Users size={16} />} label="Total Students" value={SUMMARY.totalStudents} hint="Across all sections" />
-        <StatCard icon={<LayoutGrid size={16} />} label="Classroom Capacity" value={SUMMARY.capacity} hint="Current layout 7×8" />
-        <StatCard icon={<Sofa size={16} />} label="Empty Seats" value={SUMMARY.emptySeats} hint="Available to assign" />
-        <StatCard icon={<Sparkles size={16} />} label="Generated Plans" value={SUMMARY.generatedPlans} hint="Saved arrangements" trend={12.4} />
-        <StatCard icon={<Grid3X3 size={16} />} label="Utilization" value={`${Math.round((SUMMARY.totalStudents / SUMMARY.capacity) * 100)}%`} hint="Seats occupied" trend={4.1} />
+        <StatCard icon={<Users size={16} />} label="Total Students" value={summary.totalStudents} hint="From the latest plan" />
+        <StatCard icon={<LayoutGrid size={16} />} label="Classroom Capacity" value={summary.capacity} hint="Current layout" />
+        <StatCard icon={<Sofa size={16} />} label="Empty Seats" value={summary.emptySeats} hint="Available to assign" />
+        <StatCard icon={<Sparkles size={16} />} label="Generated Plans" value={summary.generatedPlans} hint="Saved arrangements" trend={12.4} />
+        <StatCard icon={<Grid3X3 size={16} />} label="Utilization" value={`${summary.capacity ? Math.round((summary.totalStudents / summary.capacity) * 100) : 0}%`} hint="Seats occupied" trend={4.1} />
       </div>
 
       <div className={`grid grid-cols-1 ${isCaptain ? '' : 'xl:grid-cols-3'} gap-4 mt-6`}>
         <Card className={`${isCaptain ? '' : 'xl:col-span-2'} p-5`}>
           <SectionHeader title="Constraint Summary" description="Live view of who needs what before you press Generate." />
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <ConstraintStat icon={<Eye size={14} />} label="Vision Priority" value={SUMMARY.visionPriority} />
-            <ConstraintStat icon={<Ear size={14} />} label="Hearing Priority" value={SUMMARY.hearingPriority} />
-            <ConstraintStat icon={<Lock size={14} />} label="Reserved Seats" value={SUMMARY.reserved} />
-            <ConstraintStat icon={<ArrowUpToLine size={14} />} label="Front Row Required" value={SUMMARY.frontRow} />
+            <ConstraintStat icon={<Eye size={14} />} label="Vision Priority" value={summary.visionPriority} />
+            <ConstraintStat icon={<Ear size={14} />} label="Hearing Priority" value={summary.hearingPriority} />
+            <ConstraintStat icon={<Lock size={14} />} label="Reserved Seats" value={summary.reserved} />
+            <ConstraintStat icon={<ArrowUpToLine size={14} />} label="Front Row Required" value={summary.frontRow} />
           </div>
 
           <div className="mt-5 flex flex-wrap gap-2">

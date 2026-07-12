@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Search, Filter, Coins, ChevronLeft, ChevronRight } from 'lucide-react';
 import PageContainer from '../../components/layout/PageContainer.jsx';
 import PageHeader from '../../components/layout/PageHeader.jsx';
@@ -7,7 +7,8 @@ import Button from '../../components/common/Button.jsx';
 import Mission4SubNav from '../../components/mission4/Mission4SubNav.jsx';
 import TransactionRow from '../../components/mission4/TransactionRow.jsx';
 import TransactionDrawer from '../../components/mission4/TransactionDrawer.jsx';
-import { TRANSACTIONS, CATEGORIES, PAYMENT_METHODS } from '../../mocks/data/mission4.js';
+import { listTrackerEntries } from '../../services/trackerService.js';
+import { mapTrackerEntryFromApi, MISSION4_CATEGORIES, MISSION4_PAYMENT_METHODS } from '../../utils/missionApiMaps.js';
 
 const PAGE_SIZE = 10;
 
@@ -19,9 +20,25 @@ export default function LedgerHistory() {
   const [sort, setSort] = useState('date-desc');
   const [page, setPage] = useState(1);
   const [drawerTx, setDrawerTx] = useState(null);
+  const [transactions, setTransactions] = useState([]);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const res = await listTrackerEntries();
+        if (!alive) return;
+        const entries = (res?.data?.entries || res?.entries || []).map(mapTrackerEntryFromApi).filter(Boolean);
+        setTransactions(entries);
+      } catch {
+        if (alive) setTransactions([]);
+      }
+    })();
+    return () => { alive = false; };
+  }, []);
 
   const filtered = useMemo(() => {
-    let list = TRANSACTIONS.filter((t) => {
+    let list = transactions.filter((t) => {
       if (cat !== 'all' && t.category !== cat) return false;
       if (type !== 'all' && t.type !== type) return false;
       if (method !== 'all' && t.method !== method) return false;

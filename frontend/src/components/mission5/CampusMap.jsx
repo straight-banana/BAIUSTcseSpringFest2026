@@ -1,5 +1,12 @@
 import Card from '../common/Card.jsx';
-import { LOCATIONS, MAP_PINS, findLocation } from '../../mocks/data/mission5.js';
+import { MISSION5_LOCATIONS } from '../../utils/missionApiMaps.js';
+
+const MAP_PINS = [
+  { x: 10, y: 15, loc: 'classroom', active: true },
+  { x: 45, y: 12, loc: 'library', active: false },
+  { x: 70, y: 50, loc: 'canteen', active: true },
+  { x: 30, y: 65, loc: 'office', active: false },
+];
 
 export default function CampusMap() {
   return (
@@ -30,7 +37,7 @@ export default function CampusMap() {
           <rect x="5"  y="45" width="20" height="12" fill="rgb(var(--surface))" stroke="rgb(var(--border))" strokeWidth="0.4" rx="1" />
         </svg>
         {MAP_PINS.map((p, i) => {
-          const loc = findLocation(p.loc);
+          const loc = MISSION5_LOCATIONS.find(l => l.key === p.loc) || MISSION5_LOCATIONS[0];
           return (
             <div key={i} className="absolute -translate-x-1/2 -translate-y-full" style={{ left: `${p.x}%`, top: `${p.y}%` }}>
               <div className="relative flex flex-col items-center">

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import Modal from '../common/Modal.jsx';
 import Button from '../common/Button.jsx';
-import { LOCATIONS, EMERGENCY_TYPES, SEVERITIES } from '../../mocks/data/mission5.js';
+import { MISSION5_LOCATIONS, MISSION5_TYPES, MISSION5_SEVERITIES } from '../../utils/missionApiMaps.js';
 import { AlertTriangle } from 'lucide-react';
 
 const field = 'w-full h-10 rounded-md border border-border bg-surface px-3 text-sm text-fg focus:border-brand outline-none';
@@ -51,29 +51,29 @@ export default function SosReportModal({ open, onClose, onSubmit }) {
             </p>
           </div>
           <ul className="mt-4 space-y-1.5 text-sm text-fg">
-            <li><span className="text-subtle text-xs uppercase mr-2">Location:</span> {LOCATIONS.find(l=>l.key===location).label}</li>
-            <li><span className="text-subtle text-xs uppercase mr-2">Type:</span> {EMERGENCY_TYPES.find(t=>t.key===type).label}</li>
-            <li><span className="text-subtle text-xs uppercase mr-2">Severity:</span> {SEVERITIES.find(s=>s.key===severity).label}</li>
+            <li><span className="text-subtle text-xs uppercase mr-2">Location:</span> {(MISSION5_LOCATIONS.find(l=>l.key===location)||{}).label}</li>
+            <li><span className="text-subtle text-xs uppercase mr-2">Type:</span> {(MISSION5_TYPES.find(t=>t.key===type)||{}).label}</li>
+            <li><span className="text-subtle text-xs uppercase mr-2">Severity:</span> {(MISSION5_SEVERITIES.find(s=>s.key===severity)||{}).label}</li>
           </ul>
         </div>
       ) : (
         <div className="space-y-4">
           <div>
             <label className={label}>Location</label>
-            <select value={location} onChange={(e) => setLocation(e.target.value)} className={field + ' mt-1'}>
-              {LOCATIONS.map((l) => <option key={l.key} value={l.key}>{l.icon} {l.label}</option>)}
+              <select value={location} onChange={(e) => setLocation(e.target.value)} className={field + ' mt-1'}>
+              {MISSION5_LOCATIONS.map((l) => <option key={l.key} value={l.key}>{l.icon} {l.label}</option>)}
             </select>
           </div>
           <div>
             <label className={label}>Emergency Type</label>
-            <select value={type} onChange={(e) => setType(e.target.value)} className={field + ' mt-1'}>
-              {EMERGENCY_TYPES.map((t) => <option key={t.key} value={t.key}>{t.icon} {t.label}</option>)}
+              <select value={type} onChange={(e) => setType(e.target.value)} className={field + ' mt-1'}>
+              {MISSION5_TYPES.map((t) => <option key={t.key} value={t.key}>{t.icon} {t.label}</option>)}
             </select>
           </div>
           <div>
             <span className={label}>Severity Level</span>
             <div className="mt-1 grid grid-cols-4 gap-2">
-              {SEVERITIES.map((s) => (
+              {MISSION5_SEVERITIES.map((s) => (
                 <button
                   key={s.key}
                   onClick={() => setSeverity(s.key)}

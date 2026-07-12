@@ -13,13 +13,14 @@ import AnonymousNotice from '../../components/mission1/AnonymousNotice.jsx';
 import EvidenceUpload from '../../components/mission1/EvidenceUpload.jsx';
 import ConfirmationDialog from '../../components/mission1/ConfirmationDialog.jsx';
 import { useToast } from '../../components/feedback/Toast.jsx';
-import {
-  CATEGORIES, COURSES, TEACHERS, CLASSROOMS, generateReferenceId,
-} from '../../mocks/data/complaints.js';
+import { submitComplaint } from '../../services/complaintsService.js';
+import { COMPLAINT_CATEGORY_OPTIONS } from '../../utils/missionApiMaps.js';
+import { COURSES, TEACHERS, CLASSROOMS } from '../../mocks/data/complaints.js';
 import { ShieldAlert, Send, EyeOff } from 'lucide-react';
 
 const SUBJECT_MAX = 120;
 const DESC_MAX = 1200;
+const CATEGORIES = COMPLAINT_CATEGORY_OPTIONS;
 
 const today = () => new Date().toISOString().slice(0, 10);
 const nowTime = () => {
@@ -44,6 +45,7 @@ export default function ComplaintSubmit() {
   });
   const [files, setFiles] = useState([]);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
@@ -70,13 +72,35 @@ export default function ComplaintSubmit() {
 
   const valid = Object.keys(errors).length === 0;
 
-  const submit = () => {
+  const submit = async () => {
     setConfirmOpen(false);
-    const ref = generateReferenceId();
-    toast.push({ tone: 'success', title: 'Complaint submitted', message: ref });
-    nav('/mission-1/submitted', {
-      state: { referenceId: ref, category: form.category, anonymous: form.anonymous },
-    });
+    setSubmitting(true);
+    try {
+      const payload = {
+        category: form.category,
+        description: [
+          form.subject ? `Subject: ${form.subject}` : null,
+          form.description.trim(),
+          `Course: ${form.course || '—'}`,
+          `Course code: ${form.courseCode || '—'}`,
+          `Teacher: ${form.teacher || '—'}`,
+          `Classroom: ${form.classroom || '—'}`,
+          `Incident date: ${form.incidentDate}`,
+          `Incident time: ${form.incidentTime}`,
+        ].filter(Boolean).join('\n'),
+        anonymous: form.anonymous,
+      };
+      const res = await submitComplaint(payload);
+      const ref = res?.data?.referenceCode || res?.data?.id || 'submitted';
+      toast.push({ tone: 'success', title: 'Complaint submitted', message: ref });
+      nav('/mission-1/submitted', {
+        state: { referenceId: ref, category: form.category, anonymous: form.anonymous },
+      });
+    } catch (error) {
+      toast.push({ tone: 'error', title: 'Submission failed', message: error?.message || 'Please try again.' });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -228,8 +252,8 @@ export default function ComplaintSubmit() {
               <Button variant="ghost" type="button" onClick={() => nav('/mission-1')}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={!valid} leftIcon={<Send size={14} />}>
-                Submit Complaint
+              <Button type="submit" disabled={!valid || submitting} leftIcon={<Send size={14} />}>
+                {submitting ? 'Submitting…' : 'Submit Complaint'}
               </Button>
             </div>
           </Card>

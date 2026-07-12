@@ -1,3 +1,4 @@
+import { useEffect, useMemo, useState } from 'react';
 import PageContainer from '../../components/layout/PageContainer.jsx';
 import PageHeader from '../../components/layout/PageHeader.jsx';
 import Mission1SubNav from '../../components/mission1/Mission1SubNav.jsx';
@@ -8,6 +9,8 @@ import SectionHeader from '../../components/ui/SectionHeader.jsx';
 import Table from '../../components/common/Table.jsx';
 import StatusBadge from '../../components/mission1/StatusBadge.jsx';
 import CategoryBadge from '../../components/mission1/CategoryBadge.jsx';
+import { getComplaintDashboard, listComplaints } from '../../services/complaintsService.js';
+import { mapComplaintFromApi } from '../../utils/missionApiMaps.js';
 import {
   FileText, Clock, ClipboardCheck, Flame, ShieldCheck,
   Eye, BarChart3, Download,
@@ -16,10 +19,6 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend, LineChart, Line,
 } from 'recharts';
-import {
-  complaints, complaintStats, categoryDistribution,
-  complaintsOverTime, statusDistribution,
-} from '../../mocks/data/complaints.js';
 
 const CAT_COLORS = ['#FBC02D', '#FF8F00', '#C62828', '#6366f1', '#3B82F6', '#EF4444', '#10B981', '#94A3B8'];
 const STAT_COLORS = ['#94A3B8', '#FBC02D', '#3B82F6', '#10B981', '#C62828'];
@@ -30,6 +29,61 @@ const tooltipStyle = {
 };
 
 export default function CaptainDashboard() {
+  const [dashboard, setDashboard] = useState(null);
+  const [complaints, setComplaints] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const [summaryRes, listRes] = await Promise.all([getComplaintDashboard(), listComplaints()]);
+        if (!alive) return;
+        const mapped = (listRes?.complaints || []).map(mapComplaintFromApi).filter(Boolean);
+        setComplaints(mapped);
+        setDashboard(summaryRes?.data || summaryRes);
+      } finally {
+        if (alive) setLoading(false);
+      }
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  const complaintStats = useMemo(() => {
+    const total = complaints.length;
+    const pending = complaints.filter((c) => c.status === 'pending').length;
+    const underReview = complaints.filter((c) => c.status === 'under_review').length;
+    const resolved = complaints.filter((c) => c.status === 'resolved').length;
+    const critical = complaints.filter((c) => c.strikeWeight >= 3).length;
+    return { total, pending, underReview, resolved, critical };
+  }, [complaints]);
+
+  const categoryDistribution = useMemo(() => {
+    const counts = complaints.reduce((acc, c) => {
+      acc[c.category] = (acc[c.category] || 0) + 1;
+      return acc;
+    }, {});
+    return Object.entries(counts).map(([key, value]) => ({ name: key, key, value }));
+  }, [complaints]);
+
+  const statusDistribution = useMemo(() => {
+    const counts = complaints.reduce((acc, c) => {
+      acc[c.status] = (acc[c.status] || 0) + 1;
+      return acc;
+    }, {});
+    return Object.entries(counts).map(([key, value]) => ({ name: key, key, value }));
+  }, [complaints]);
+
+  const complaintsOverTime = useMemo(() => Array.from({ length: 6 }, (_, i) => ({
+    day: `D${i + 1}`,
+    complaints: complaints.slice(i, i + 2).length,
+    resolved: complaints.filter((c) => c.status === 'resolved').slice(i, i + 1).length,
+  })), [complaints]);
+
+  if (loading) {
+    return <PageContainer><div className="py-10 text-center text-sm text-muted">Loading dashboard…</div></PageContainer>;
+  }
+
   return (
     <PageContainer>
       <PageHeader

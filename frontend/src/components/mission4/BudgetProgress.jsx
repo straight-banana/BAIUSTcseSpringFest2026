@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import { cx } from '../../utils/index.js';
-import { formatBDT } from '../../mocks/data/mission4.js';
+import { formatBDT } from '../../utils/missionApiMaps.js';
 
 function BudgetProgress({ label, spent, budget, tone = 'brand' }) {
   const pct = Math.min(100, Math.round((spent / budget) * 100));

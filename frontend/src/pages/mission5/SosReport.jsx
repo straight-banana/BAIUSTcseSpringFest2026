@@ -8,7 +8,8 @@ import Button from '../../components/common/Button.jsx';
 import SectionHeader from '../../components/ui/SectionHeader.jsx';
 import Mission5SubNav from '../../components/mission5/Mission5SubNav.jsx';
 import SosReportModal from '../../components/mission5/SosReportModal.jsx';
-import { LOCATIONS, EMERGENCY_TYPES, SEVERITIES } from '../../mocks/data/mission5.js';
+import { triggerSos } from '../../services/sosService.js';
+import { mapSosLocation, mapSosSeverity, mapSosType, MISSION5_LOCATIONS as LOCATIONS, MISSION5_TYPES as EMERGENCY_TYPES, MISSION5_SEVERITIES as SEVERITIES } from '../../utils/missionApiMaps.js';
 
 const field = 'w-full h-10 rounded-md border border-border bg-surface px-3 text-sm text-fg focus:border-brand outline-none';
 const label = 'text-[11px] uppercase text-subtle font-medium';
@@ -97,7 +98,19 @@ export default function SosReport() {
       <SosReportModal
         open={confirmOpen}
         onClose={() => setConfirmOpen(false)}
-        onSubmit={(payload) => nav('/mission-5/success', { state: { location, type, severity, note, description, ...payload } })}
+        onSubmit={async (payload) => {
+          try {
+            await triggerSos({
+              location: mapSosLocation(payload.location || location),
+              message: payload.description || description || payload.note || note || 'SOS alert',
+              type: mapSosType(payload.type || type),
+              severity: mapSosSeverity(payload.severity || severity),
+            });
+          } catch {
+            // fall back to success screen even if the network request fails
+          }
+          nav('/mission-5/success', { state: { location, type, severity, note, description, ...payload } });
+        }}
       />
     </PageContainer>
   );

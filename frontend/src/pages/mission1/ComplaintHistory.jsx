@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback } from 'react';
+import { useMemo, useState, useCallback, useEffect } from 'react';
 import PageContainer from '../../components/layout/PageContainer.jsx';
 import PageHeader from '../../components/layout/PageHeader.jsx';
 import Mission1SubNav from '../../components/mission1/Mission1SubNav.jsx';
@@ -14,12 +14,15 @@ import ComplaintCard from '../../components/mission1/ComplaintCard.jsx';
 import ModerationModal from '../../components/mission1/ModerationModal.jsx';
 import Pagination from '../../components/ui/Pagination.jsx';
 import EmptyState from '../../components/feedback/EmptyState.jsx';
-import { CATEGORIES, STATUSES, complaints as seedComplaints } from '../../mocks/data/complaints.js';
+import { listComplaints, updateComplaintStatus } from '../../services/complaintsService.js';
+import { COMPLAINT_CATEGORY_OPTIONS, COMPLAINT_STATUS_OPTIONS, mapComplaintFromApi } from '../../utils/missionApiMaps.js';
 import { History, Eye, ArrowUpDown, Gavel } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useToast } from '../../components/feedback/Toast.jsx';
 
 const PAGE_SIZE = 8;
+const CATEGORIES = COMPLAINT_CATEGORY_OPTIONS;
+const STATUSES = COMPLAINT_STATUS_OPTIONS;
 
 function StrikeWeightCell({ w = 0 }) {
   const tone = w >= 3 ? 'text-danger' : w === 2 ? 'text-warning' : w === 1 ? 'text-brand' : 'text-muted';
@@ -36,13 +39,31 @@ export default function ComplaintHistory() {
   const { role } = useAuth();
   const toast = useToast();
   const isReviewer = role === 'teacher' || role === 'office';
-  const [rows, setRows] = useState(seedComplaints);
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [q, setQ] = useState('');
   const [cat, setCat] = useState('');
   const [status, setStatus] = useState('');
   const [sort, setSort] = useState('newest');
   const [page, setPage] = useState(1);
   const [reviewing, setReviewing] = useState(null);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const result = await listComplaints();
+        if (!alive) return;
+        const nextRows = (result?.complaints || []).map(mapComplaintFromApi).filter(Boolean);
+        setRows(nextRows);
+      } catch (error) {
+        toast.push({ tone: 'error', title: 'Unable to load complaints', message: error?.message || 'Please refresh.' });
+      } finally {
+        if (alive) setLoading(false);
+      }
+    })();
+    return () => { alive = false; };
+  }, [toast]);
 
   const filtered = useMemo(() => {
     let out = rows.filter((c) => {
@@ -52,7 +73,7 @@ export default function ComplaintHistory() {
         const s = q.toLowerCase();
         if (
           !c.title.toLowerCase().includes(s) &&
-          !c.id.toLowerCase().includes(s) &&
+          !c.referenceId.toLowerCase().includes(s) &&
           !(c.course || '').toLowerCase().includes(s)
         ) return false;
       }
@@ -70,24 +91,30 @@ export default function ComplaintHistory() {
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const pageRows = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  const handleDecide = useCallback(({ decision, notes }) => {
+  const handleDecide = useCallback(async ({ decision, notes }) => {
     if (!reviewing) return;
-    const nextStatus = decision === 'resolved' ? 'resolved'
-      : decision === 'rejected' ? 'rejected'
-      : 'under_review';
-    setRows((prev) => prev.map((c) => c.id === reviewing.id
-      ? { ...c, status: nextStatus, teacherRemark: notes, lastUpdated: new Date().toISOString() }
-      : c));
-    toast.push({
-      tone: nextStatus === 'resolved' ? 'success' : nextStatus === 'rejected' ? 'error' : 'warning',
-      title: `Case ${reviewing.id}`,
-      message: `Marked as ${nextStatus.replace('_', ' ')}.`,
-    });
-    setReviewing(null);
+    const nextStatus = decision === 'resolved' ? 'RESOLVED'
+      : decision === 'rejected' ? 'REJECTED'
+      : 'UNDER_REVIEW';
+    try {
+      await updateComplaintStatus(reviewing.dbId, nextStatus, notes);
+      setRows((prev) => prev.map((c) => c.dbId === reviewing.dbId
+        ? { ...c, status: nextStatus.toLowerCase(), teacherRemark: notes, lastUpdated: new Date().toISOString() }
+        : c));
+      toast.push({
+        tone: nextStatus === 'RESOLVED' ? 'success' : nextStatus === 'REJECTED' ? 'error' : 'warning',
+        title: `Case ${reviewing.referenceId}`,
+        message: `Marked as ${nextStatus.replace('_', ' ').toLowerCase()}.`,
+      });
+    } catch (error) {
+      toast.push({ tone: 'error', title: 'Decision failed', message: error?.message || 'Please try again.' });
+    } finally {
+      setReviewing(null);
+    }
   }, [reviewing, toast]);
 
   const columns = useMemo(() => [
-    { key: 'id', label: 'Anonymous ID', render: (r) => <span className="font-mono text-xs">{r.id}</span> },
+    { key: 'referenceId', label: 'Anonymous ID', render: (r) => <span className="font-mono text-xs">{r.referenceId}</span> },
     { key: 'category', label: 'Category', render: (r) => <CategoryBadge category={r.category} /> },
     { key: 'submittedAt', label: 'Submitted', render: (r) => new Date(r.submittedAt).toLocaleDateString() },
     { key: 'status', label: 'Status', render: (r) => <StatusBadge status={r.status} /> },
@@ -139,7 +166,9 @@ export default function ComplaintHistory() {
         </div>
       </Card>
 
-      {filtered.length === 0 ? (
+      {loading ? (
+        <div className="py-8 text-center text-sm text-muted">Loading complaints…</div>
+      ) : filtered.length === 0 ? (
         <EmptyState title="No complaints found" message="Try adjusting your search or filters." />
       ) : (
         <>

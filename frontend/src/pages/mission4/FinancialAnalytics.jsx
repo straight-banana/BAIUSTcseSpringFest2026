@@ -1,3 +1,4 @@
+import { useEffect, useMemo, useState } from 'react';
 import {
   ResponsiveContainer, LineChart, Line, AreaChart, Area, BarChart, Bar,
   PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
@@ -8,7 +9,9 @@ import PageHeader from '../../components/layout/PageHeader.jsx';
 import Mission4SubNav from '../../components/mission4/Mission4SubNav.jsx';
 import KpiCard from '../../components/mission4/KpiCard.jsx';
 import ChartContainer from '../../components/mission4/ChartContainer.jsx';
-import { SUMMARY, TRANSACTIONS, MONTHLY_TREND, CATEGORY_BREAKDOWN, WEEKLY_SPEND, BALANCE_TREND, formatBDT, TIFFIN_STATS } from '../../mocks/data/mission4.js';
+import { listTrackerEntries, getTrackerSummary, getBudgets, getMenu } from '../../services/trackerService.js';
+import { mapTrackerEntryFromApi } from '../../utils/missionApiMaps.js';
+import { formatBDT } from '../../utils/missionApiMaps.js';
 
 const COLORS = ['#FF8F00', '#FBC02D', '#C62828', '#4C8C2B', '#8B5CF6', '#0891B2', '#EC4899', '#F97316'];
 const axisStyle = { fontSize: 11, fill: 'rgb(var(--muted))' };
@@ -16,16 +19,39 @@ const gridStyle = { stroke: 'rgb(var(--border))', strokeDasharray: '3 3' };
 const tooltipStyle = { background: 'rgb(var(--elevated))', border: '1px solid rgb(var(--border))', borderRadius: 8, fontSize: 12, color: 'rgb(var(--fg))' };
 
 export default function FinancialAnalytics() {
-  const expenses = TRANSACTIONS.filter((t) => t.type === 'expense');
-  const incomes  = TRANSACTIONS.filter((t) => t.type === 'income');
-  const avgExpense = Math.round(SUMMARY.expense / Math.max(1, expenses.length));
-  const avgIncome  = Math.round(SUMMARY.income / Math.max(1, incomes.length));
-  const largestExpense = Math.max(...expenses.map((t) => t.amount));
-  const highestIncome  = Math.max(...incomes.map((t) => t.amount));
-  const savingsRate = Math.round(((SUMMARY.income - SUMMARY.expense) / Math.max(1, SUMMARY.income)) * 100);
-  const topMonth = [...MONTHLY_TREND].sort((a, b) => b.expense - a.expense)[0];
-  const topCats = [...CATEGORY_BREAKDOWN].sort((a, b) => b.value - a.value).slice(0, 5);
+  const [transactions, setTransactions] = useState([]);
+  const [summary, setSummary] = useState({ totalMoney: 0, totalFood: 0, grandTotal: 0, funAnalysis: {} });
+  const [menu, setMenu] = useState(null);
+  const [budgets, setBudgets] = useState([]);
 
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const [entriesRes, summaryRes, budgetsRes, menuRes] = await Promise.all([listTrackerEntries(), getTrackerSummary(), getBudgets(), getMenu()]);
+        if (!alive) return;
+        const entries = (entriesRes?.data?.entries || entriesRes?.entries || []).map(mapTrackerEntryFromApi).filter(Boolean);
+        setTransactions(entries);
+        setSummary(summaryRes?.data || summaryRes || { totalMoney: 0, totalFood: 0, grandTotal: 0, funAnalysis: {} });
+        setBudgets(budgetsRes?.data || budgetsRes || []);
+        setMenu(menuRes?.data || menuRes || null);
+      } catch {
+        if (alive) { setTransactions([]); setSummary({ totalMoney: 0, totalFood: 0, grandTotal: 0, funAnalysis: {} }); setBudgets([]); setMenu(null); }
+      }
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  const expenses = transactions.filter((t) => t.type === 'expense');
+  const incomes  = transactions.filter((t) => t.type === 'income');
+  const avgExpense = Math.round((summary.totalFood || 0) / Math.max(1, expenses.length));
+  const avgIncome  = Math.round((summary.totalMoney || 0) / Math.max(1, incomes.length));
+  const largestExpense = Math.max(...expenses.map((t) => t.amount), 0);
+  const highestIncome  = Math.max(...incomes.map((t) => t.amount), 0);
+  const savingsRate = Math.round(((summary.totalMoney - summary.totalFood) / Math.max(1, summary.totalMoney)) * 100);
+  const topMonth = useMemo(() => [{ month: 'Current', income: summary.totalMoney, expense: summary.totalFood }], [summary]);
+  const topCats = useMemo(() => [{ name: 'Tiffin', value: summary.totalFood }], [summary]);
+  const tiffinBudget = budgets.find((b) => b.type === 'TIFFIN')?.amount || 12000;
   const daily = Array.from({ length: 14 }, (_, i) => ({ day: `D${i + 1}`, amount: 200 + Math.round(Math.random() * 900) }));
 
   return (
@@ -42,8 +68,8 @@ export default function FinancialAnalytics() {
         <KpiCard icon={<TrendingUp size={14} />} label="Avg Income" value={formatBDT(avgIncome)} delta={5.2} tone="success" />
         <KpiCard icon={<Award size={14} />} label="Largest Expense" value={formatBDT(largestExpense)} tone="warning" />
         <KpiCard icon={<Award size={14} />} label="Highest Income" value={formatBDT(highestIncome)} tone="success" />
-        <KpiCard icon={<Wallet size={14} />} label="Remaining Budget" value={formatBDT(SUMMARY.tiffinBudget - SUMMARY.tiffinSpent)} />
-        <KpiCard icon={<Utensils size={14} />} label="Food / Student" value={formatBDT(TIFFIN_STATS.perStudent)} tone="warning" />
+        <KpiCard icon={<Wallet size={14} />} label="Remaining Budget" value={formatBDT(Math.max(0, tiffinBudget - (summary.totalFood || 0)))} />
+        <KpiCard icon={<Utensils size={14} />} label="Food / Student" value={formatBDT(menu?.items?.length ? 0 : 0)} tone="warning" />
         <KpiCard icon={<Sigma size={14} />} label="Expense Growth" value="+12.4%" delta={12.4} tone="danger" />
         <KpiCard icon={<PiggyBank size={14} />} label="Savings Rate" value={`${savingsRate}%`} delta={savingsRate} tone="success" />
       </div>
@@ -51,7 +77,7 @@ export default function FinancialAnalytics() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
         <ChartContainer title="Income vs Expense" description={`Peak: ${topMonth.month} (${formatBDT(topMonth.expense)} expense)`}>
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={MONTHLY_TREND}>
+            <AreaChart data={topMonth}>
               <defs>
                 <linearGradient id="inc" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#4C8C2B" stopOpacity={0.5} /><stop offset="100%" stopColor="#4C8C2B" stopOpacity={0} /></linearGradient>
                 <linearGradient id="exp" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#C62828" stopOpacity={0.5} /><stop offset="100%" stopColor="#C62828" stopOpacity={0} /></linearGradient>
@@ -82,8 +108,8 @@ export default function FinancialAnalytics() {
         <ChartContainer title="Category Breakdown" description="Expense share by category">
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
-              <Pie data={CATEGORY_BREAKDOWN} dataKey="value" nameKey="name" innerRadius={50} outerRadius={95} paddingAngle={2}>
-                {CATEGORY_BREAKDOWN.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+              <Pie data={topCats} dataKey="value" nameKey="name" innerRadius={50} outerRadius={95} paddingAngle={2}>
+                {topCats.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
               </Pie>
               <Tooltip contentStyle={tooltipStyle} />
               <Legend wrapperStyle={{ fontSize: 11 }} />

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import Modal from '../common/Modal.jsx';
 import Button from '../common/Button.jsx';
-import { CATEGORIES, PAYMENT_METHODS } from '../../mocks/data/mission4.js';
+import { MISSION4_CATEGORIES as CATEGORIES, MISSION4_PAYMENT_METHODS as PAYMENT_METHODS } from '../../utils/missionApiMaps.js';
 import { Paperclip } from 'lucide-react';
 
 const field = 'w-full h-10 rounded-md border border-border bg-surface px-3 text-sm text-fg focus:border-brand outline-none';

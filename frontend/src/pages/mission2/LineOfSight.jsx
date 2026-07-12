@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import PageContainer from '../../components/layout/PageContainer.jsx';
 import PageHeader from '../../components/layout/PageHeader.jsx';
 import Mission2SubNav from '../../components/mission2/Mission2SubNav.jsx';
@@ -7,13 +7,30 @@ import Select from '../../components/forms/Select.jsx';
 import LineOfSightOverlay from '../../components/mission2/LineOfSightOverlay.jsx';
 import Badge from '../../components/ui/Badge.jsx';
 import { Target } from 'lucide-react';
-import { CLASSROOM_SIZES, buildSeatingPlan, STUDENTS } from '../../mocks/data/mission2.js';
+import { CLASSROOM_SIZES as FALLBACK_SIZES, buildSeatingPlan as buildFallbackPlan, STUDENTS } from '../../mocks/data/mission2.js';
+import { getLatestPlan } from '../../services/seatsService.js';
+import { mapSeatPlanFromApi } from '../../utils/missionApiMaps.js';
 
 export default function LineOfSight() {
-  const size = CLASSROOM_SIZES[1];
-  const seats = useMemo(() => buildSeatingPlan(size.rows, size.cols, STUDENTS.slice(0, 30)), [size]);
+  const size = FALLBACK_SIZES[1];
+  const [apiPlan, setApiPlan] = useState(null);
+  const [seats, setSeats] = useState(() => buildFallbackPlan(size.rows, size.cols, STUDENTS.slice(0, 30)));
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const res = await getLatestPlan();
+        if (!alive) return;
+        const plan = mapSeatPlanFromApi(res?.data || res);
+        if (plan) setApiPlan(plan);
+      } catch {}
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  useEffect(() => { if (apiPlan) setSeats(apiPlan.seats || []); }, [apiPlan]);
   const seated = seats.filter((s) => s.student);
-  const [targetId, setTargetId] = useState(seated[6]?.student.id);
+  const [targetId, setTargetId] = useState(seated[6]?.student?.id);
 
   const target = seated.find((s) => s.student.id === targetId);
 

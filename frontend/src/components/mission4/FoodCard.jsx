@@ -1,7 +1,7 @@
 import { memo } from 'react';
 import Card from '../common/Card.jsx';
 import Badge from '../ui/Badge.jsx';
-import { formatBDT } from '../../mocks/data/mission4.js';
+import { formatBDT } from '../../utils/missionApiMaps.js';
 
 const popTone = { top: 'brand', high: 'success', medium: 'warning', low: 'neutral' };
 const popLabel = { top: '🔥 Top', high: 'Popular', medium: 'Medium', low: 'Low demand' };

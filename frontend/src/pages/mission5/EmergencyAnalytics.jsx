@@ -6,7 +6,8 @@ import Card from '../../components/common/Card.jsx';
 import SectionHeader from '../../components/ui/SectionHeader.jsx';
 import { StatCard } from '../../components/common/Cards.jsx';
 import Mission5SubNav from '../../components/mission5/Mission5SubNav.jsx';
-import { SUMMARY, BY_LOCATION, BY_TYPE, RESPONSE_TIME, PEAK_HOURS, MONTHLY_TREND } from '../../mocks/data/mission5.js';
+import { getSosAnalytics } from '../../services/sosService.js';
+import { useEffect, useState } from 'react';
 
 const COLORS = ['#C62828', '#FF8F00', '#FBC02D', '#4C8C2B', '#8B5CF6', '#0891B2', '#EC4899', '#F97316'];
 const axisStyle = { fontSize: 11, fill: 'rgb(var(--muted))' };
@@ -14,17 +15,47 @@ const gridStyle = { stroke: 'rgb(var(--border))', strokeDasharray: '3 3' };
 const tooltipStyle = { background: 'rgb(var(--elevated))', border: '1px solid rgb(var(--border))', borderRadius: 8, fontSize: 12, color: 'rgb(var(--fg))' };
 
 export default function EmergencyAnalytics() {
-  const peak = [...PEAK_HOURS].sort((a, b) => b.alerts - a.alerts)[0];
+  const [summary, setSummary] = useState({ total: 0, avgResponse: '—' });
+  const [byLocation, setByLocation] = useState([]);
+  const [byType, setByType] = useState([]);
+  const [responseTime, setResponseTime] = useState([]);
+  const [peakHours, setPeakHours] = useState([]);
+  const [monthlyTrend, setMonthlyTrend] = useState([]);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const res = await getSosAnalytics();
+        if (!alive) return;
+        const data = res?.data || res || {};
+        setSummary({ total: data.total || 0, avgResponse: data.avgResponse || '—' });
+        setByLocation(data.byLocation || []);
+        setByType(data.byType || []);
+        setResponseTime(data.responseTime || []);
+        setPeakHours(data.peakHours || []);
+        setMonthlyTrend(data.monthlyTrend || []);
+      } catch {
+        if (alive) {
+          setSummary({ total: 0, avgResponse: '—' });
+          setByLocation([]); setByType([]); setResponseTime([]); setPeakHours([]); setMonthlyTrend([]);
+        }
+      }
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  const peak = [...peakHours].sort((a, b) => (b.alerts || 0) - (a.alerts || 0))[0] || { hour: '—', alerts: 0 };
   return (
     <PageContainer>
       <PageHeader title="Emergency Analytics" subtitle="Trends, hotspots and response performance." icon={<BarChart3 size={18} />} />
       <Mission5SubNav />
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <StatCard icon={<Activity size={16} />} label="Total Alerts" value={SUMMARY.total} hint="All time" trend={9.4} />
-        <StatCard icon={<Clock size={16} />}    label="Avg Response" value={SUMMARY.avgResponse} hint="Rolling 7d" trend={-6.2} />
+        <StatCard icon={<Activity size={16} />} label="Total Alerts" value={summary.total} hint="All time" trend={9.4} />
+        <StatCard icon={<Clock size={16} />}    label="Avg Response" value={summary.avgResponse} hint="Rolling 7d" trend={-6.2} />
         <StatCard icon={<TrendingUp size={16} />} label="Peak Hour" value={peak.hour} hint={`${peak.alerts} alerts`} />
-        <StatCard icon={<MapPin size={16} />}   label="Top Location" value={[...BY_LOCATION].sort((a,b)=>b.value-a.value)[0].name} hint="Most reports" />
+        <StatCard icon={<MapPin size={16} />}   label="Top Location" value={[...(byLocation || [])].sort((a,b)=>b.value-a.value)[0]?.name || '—'} hint="Most reports" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
@@ -32,7 +63,7 @@ export default function EmergencyAnalytics() {
           <SectionHeader title="Alerts by Location" description="Hotspots on campus" />
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={BY_LOCATION}>
+              <BarChart data={byLocation}>
                 <CartesianGrid {...gridStyle} />
                 <XAxis dataKey="name" tick={axisStyle} />
                 <YAxis tick={axisStyle} />
@@ -48,8 +79,8 @@ export default function EmergencyAnalytics() {
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
-                <Pie data={BY_TYPE} dataKey="value" nameKey="name" innerRadius={50} outerRadius={90} paddingAngle={2}>
-                  {BY_TYPE.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                <Pie data={byType} dataKey="value" nameKey="name" innerRadius={50} outerRadius={90} paddingAngle={2}>
+                  {byType.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                 </Pie>
                 <Tooltip contentStyle={tooltipStyle} />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
@@ -62,7 +93,7 @@ export default function EmergencyAnalytics() {
           <SectionHeader title="Response Time" description="Average minutes to accept" />
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={RESPONSE_TIME}>
+              <LineChart data={responseTime}>
                 <CartesianGrid {...gridStyle} />
                 <XAxis dataKey="day" tick={axisStyle} />
                 <YAxis tick={axisStyle} />
@@ -77,7 +108,7 @@ export default function EmergencyAnalytics() {
           <SectionHeader title="Peak Hours" description="Alerts by hour of day" />
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={PEAK_HOURS}>
+              <AreaChart data={peakHours}>
                 <defs>
                   <linearGradient id="peak" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor="#C62828" stopOpacity={0.5} />
@@ -99,7 +130,7 @@ export default function EmergencyAnalytics() {
         <SectionHeader title="Monthly Trend" description="Alerts vs resolved" />
         <div className="h-72">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={MONTHLY_TREND}>
+            <BarChart data={monthlyTrend}>
               <CartesianGrid {...gridStyle} />
               <XAxis dataKey="month" tick={axisStyle} />
               <YAxis tick={axisStyle} />

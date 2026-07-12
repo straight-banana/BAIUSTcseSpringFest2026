@@ -1,7 +1,7 @@
 import Badge from '../ui/Badge.jsx';
-import { findSeverity } from '../../mocks/data/mission5.js';
+import { sosSeverityBadge } from '../../utils/missionApiMaps.js';
 
 export default function SeverityBadge({ severity }) {
-  const s = findSeverity(severity);
+  const s = sosSeverityBadge(severity);
   return <Badge tone={s.tone}>{s.label}</Badge>;
 }

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import PageContainer from '../../components/layout/PageContainer.jsx';
 import PageHeader from '../../components/layout/PageHeader.jsx';
 import Mission2SubNav from '../../components/mission2/Mission2SubNav.jsx';
@@ -11,14 +11,29 @@ import ClassroomLegend from '../../components/mission2/ClassroomLegend.jsx';
 import ConstraintBadge from '../../components/mission2/ConstraintBadge.jsx';
 import { useToast } from '../../components/feedback/Toast.jsx';
 import { Sparkles, Printer, Download, Save, Eye, Ear, ArrowUpToLine, Users } from 'lucide-react';
-import { CLASSROOM_SIZES, buildSeatingPlan, STUDENTS, SUMMARY } from '../../mocks/data/mission2.js';
+import { getLatestPlan } from '../../services/seatsService.js';
+import { mapSeatPlanFromApi } from '../../utils/missionApiMaps.js';
 
 export default function GeneratedPlan() {
   const toast = useToast();
-  const size = CLASSROOM_SIZES[2]; // 7x8
-  const [seed, setSeed] = useState(0);
-  const seats = useMemo(() => buildSeatingPlan(size.rows, size.cols, [...STUDENTS].reverse().slice(0, 34)), [size, seed]);
+  const [plan, setPlan] = useState(null);
   const [selected, setSelected] = useState(null);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const res = await getLatestPlan();
+        if (alive) setPlan(mapSeatPlanFromApi(res?.data || res));
+      } catch {
+        if (alive) setPlan(null);
+      }
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  const size = useMemo(() => ({ rows: plan?.gridRows || 7, cols: plan?.gridCols || 8 }), [plan]);
+  const seats = useMemo(() => plan?.seats || [], [plan]);
 
   return (
     <PageContainer>
@@ -37,9 +52,9 @@ export default function GeneratedPlan() {
       <Mission2SubNav />
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <StatCard icon={<Users size={16} />} label="Seated" value={STUDENTS.slice(0, 34).length} hint="Of 34 total" />
-        <StatCard icon={<Eye size={16} />} label="Vision Placed" value={SUMMARY.visionPriority} hint="Front 2 rows" />
-        <StatCard icon={<Ear size={16} />} label="Hearing Placed" value={SUMMARY.hearingPriority} hint="Within earshot" />
+        <StatCard icon={<Users size={16} />} label="Seated" value={seats.length} hint="From the latest plan" />
+        <StatCard icon={<Eye size={16} />} label="Vision Placed" value={seats.filter((seat) => seat.hasVisionProblem).length} hint="Front 2 rows" />
+        <StatCard icon={<Ear size={16} />} label="Hearing Placed" value={seats.filter((seat) => seat.hasHearingProblem).length} hint="Within earshot" />
         <StatCard icon={<ArrowUpToLine size={16} />} label="Constraint Satisfaction" value="100%" hint="All rules honored" trend={2.1} />
       </div>
 

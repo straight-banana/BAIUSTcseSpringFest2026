@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Search, Filter, History, ChevronLeft, ChevronRight } from 'lucide-react';
 import PageContainer from '../../components/layout/PageContainer.jsx';
 import PageHeader from '../../components/layout/PageHeader.jsx';
@@ -9,7 +9,15 @@ import AlertCard from '../../components/mission5/AlertCard.jsx';
 import AlertDrawer from '../../components/mission5/AlertDrawer.jsx';
 import SosStatusBadge from '../../components/mission5/SosStatusBadge.jsx';
 import SeverityBadge from '../../components/mission5/SeverityBadge.jsx';
-import { CURRENT_STUDENT_HISTORY, LOCATIONS, STATUSES, findLocation, findType } from '../../mocks/data/mission5.js';
+import { listAllSos } from '../../services/sosService.js';
+import { mapSosAlertFromApi, MISSION5_LOCATIONS } from '../../utils/missionApiMaps.js';
+const STATUSES = [
+  { key: 'active', label: 'Active' },
+  { key: 'claimed', label: 'Claimed' },
+  { key: 'responding', label: 'Responding' },
+  { key: 'resolved', label: 'Resolved' },
+  { key: 'cancelled', label: 'Cancelled' },
+];
 
 const PAGE = 8;
 
@@ -19,17 +27,31 @@ export default function SosHistory() {
   const [status, setStatus] = useState('all');
   const [page, setPage] = useState(1);
   const [drawer, setDrawer] = useState(null);
+  const [alerts, setAlerts] = useState([]);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const res = await listAllSos();
+        if (!alive) return;
+        const nextAlerts = (res?.data?.alerts || res?.alerts || []).map(mapSosAlertFromApi).filter(Boolean);
+        setAlerts(nextAlerts);
+      } catch {
+        if (alive) setAlerts([]);
+      }
+    })();
+    return () => { alive = false; };
+  }, []);
 
   const list = useMemo(() => {
-    // Pad with mock data to have more rows
-    const combined = [...CURRENT_STUDENT_HISTORY, ...CURRENT_STUDENT_HISTORY.map((a, i) => ({ ...a, id: a.id + '-B' + i }))];
-    return combined.filter((a) => {
+    return alerts.filter((a) => {
       if (loc !== 'all' && a.location !== loc) return false;
       if (status !== 'all' && a.status !== status) return false;
       if (q && !(`${a.id} ${a.description}`.toLowerCase().includes(q.toLowerCase()))) return false;
       return true;
     });
-  }, [q, loc, status]);
+  }, [q, loc, status, alerts]);
 
   const totalPages = Math.max(1, Math.ceil(list.length / PAGE));
   const rows = list.slice((page - 1) * PAGE, page * PAGE);
@@ -55,7 +77,7 @@ export default function SosHistory() {
             <Filter size={14} className="text-muted" />
             <select value={loc} onChange={(e) => { setLoc(e.target.value); setPage(1); }} className={selectCls}>
               <option value="all">All Locations</option>
-              {LOCATIONS.map((l) => <option key={l.key} value={l.key}>{l.icon} {l.label}</option>)}
+              {MISSION5_LOCATIONS.map((l) => <option key={l.key} value={l.key}>{l.icon} {l.label}</option>)}
             </select>
             <select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }} className={selectCls}>
               <option value="all">All Statuses</option>
@@ -83,8 +105,8 @@ export default function SosHistory() {
                 <tr key={a.id} onClick={() => setDrawer(a)} className="border-t border-border hover:bg-surface/60 cursor-pointer">
                   <td className="px-4 py-3 text-xs font-mono text-fg">{a.id}</td>
                   <td className="px-4 py-3 text-xs text-muted">{new Date(a.time).toLocaleString()}</td>
-                  <td className="px-4 py-3 text-sm">{findLocation(a.location).icon} {findLocation(a.location).label}</td>
-                  <td className="px-4 py-3 text-sm">{findType(a.type).icon} {findType(a.type).label}</td>
+                  <td className="px-4 py-3 text-sm">{a.location}</td>
+                  <td className="px-4 py-3 text-sm">{a.type}</td>
                   <td className="px-4 py-3"><SeverityBadge severity={a.severity} /></td>
                   <td className="px-4 py-3"><SosStatusBadge status={a.status} /></td>
                   <td className="px-4 py-3 text-xs text-muted">{a.captain || '—'}</td>

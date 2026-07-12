@@ -3,7 +3,7 @@ import { X, Paperclip, ShieldCheck } from 'lucide-react';
 import CategoryBadge from './CategoryBadge.jsx';
 import PaymentBadge from './PaymentBadge.jsx';
 import StatusPill from './StatusPill.jsx';
-import { formatBDT, AUDIT_TRAIL } from '../../mocks/data/mission4.js';
+import { formatBDT, AUDIT_TRAIL } from '../../utils/missionApiMaps.js';
 
 export default function TransactionDrawer({ tx, onClose }) {
   return (

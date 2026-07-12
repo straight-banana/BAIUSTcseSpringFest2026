@@ -1,7 +1,7 @@
 import Badge from '../ui/Badge.jsx';
-import { findCategory } from '../../mocks/data/complaints.js';
+import { normalizeComplaintCategory } from '../../utils/missionApiMaps.js';
 
 export default function CategoryBadge({ category }) {
-  const c = findCategory(category);
+  const c = normalizeComplaintCategory(category);
   return <Badge tone={c.tone}>{c.label}</Badge>;
 }

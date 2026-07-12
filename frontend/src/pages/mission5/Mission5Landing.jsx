@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Siren, History, ShieldAlert, Phone, HeartPulse } from 'lucide-react';
 import PageContainer from '../../components/layout/PageContainer.jsx';
@@ -9,14 +9,42 @@ import Mission5SubNav from '../../components/mission5/Mission5SubNav.jsx';
 import SosButton from '../../components/mission5/SosButton.jsx';
 import SosReportModal from '../../components/mission5/SosReportModal.jsx';
 import AlertCard from '../../components/mission5/AlertCard.jsx';
-import { CURRENT_STUDENT_HISTORY, EMERGENCY_TIPS } from '../../mocks/data/mission5.js';
+import { listAllSos, triggerSos } from '../../services/sosService.js';
+import { mapSosAlertFromApi, mapSosLocation, mapSosSeverity, mapSosType, MISSION5_TIPS } from '../../utils/missionApiMaps.js';
 
 export default function Mission5Landing() {
   const [modal, setModal] = useState(false);
+  const [alerts, setAlerts] = useState([]);
   const nav = useNavigate();
 
-  const onSubmit = (payload) => {
-    nav('/mission-5/success', { state: payload });
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const res = await listAllSos();
+        if (!alive) return;
+        const nextAlerts = (res?.data?.alerts || res?.alerts || []).map(mapSosAlertFromApi).filter(Boolean);
+        setAlerts(nextAlerts);
+      } catch {
+        if (alive) setAlerts([]);
+      }
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  const onSubmit = async (payload) => {
+    try {
+      const res = await triggerSos({
+        location: mapSosLocation(payload.location),
+        message: payload.description || payload.note || 'SOS alert',
+        type: mapSosType(payload.type),
+        severity: mapSosSeverity(payload.severity),
+      });
+      const alert = mapSosAlertFromApi(res?.data || res);
+      nav('/mission-5/success', { state: { ...payload, alertId: alert?.id || null } });
+    } catch {
+      nav('/mission-5/success', { state: payload });
+    }
   };
 
   return (
@@ -70,7 +98,7 @@ export default function Mission5Landing() {
           action={<Link to="/mission-5/history" className="text-xs text-brand hover:underline">View all</Link>}
         />
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {CURRENT_STUDENT_HISTORY.slice(0, 3).map((a) => <AlertCard key={a.id} alert={a} onClick={() => {}} />)}
+          {alerts.slice(0, 3).map((a) => <AlertCard key={a.id} alert={a} onClick={() => {}} />)}
         </div>
       </Card>
 

@@ -6,10 +6,26 @@ import SectionHeader from '../../components/ui/SectionHeader.jsx';
 import Mission5SubNav from '../../components/mission5/Mission5SubNav.jsx';
 import CampusMap from '../../components/mission5/CampusMap.jsx';
 import AlertCard from '../../components/mission5/AlertCard.jsx';
-import { ALERTS } from '../../mocks/data/mission5.js';
+import { useEffect, useState } from 'react';
+import { listAllSos } from '../../services/sosService.js';
+import { mapSosAlertFromApi } from '../../utils/missionApiMaps.js';
 
 export default function EmergencyMap() {
-  const active = ALERTS.filter((a) => ['pending','received','responding'].includes(a.status)).slice(0, 4);
+  const [active, setActive] = useState([]);
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const res = await listAllSos();
+        if (!alive) return;
+        const mapped = (res?.data?.alerts || res?.alerts || []).map(mapSosAlertFromApi).filter(Boolean);
+        setActive(mapped.filter((a) => ['pending','received','responding'].includes(a.status)).slice(0, 4));
+      } catch {
+        if (alive) setActive([]);
+      }
+    })();
+    return () => { alive = false; };
+  }, []);
   return (
     <PageContainer>
       <PageHeader title="Emergency Map" subtitle="Live-location placeholder — real map coming soon." icon={<Map size={18} />} />

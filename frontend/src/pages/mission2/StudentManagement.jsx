@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import PageContainer from '../../components/layout/PageContainer.jsx';
 import PageHeader from '../../components/layout/PageHeader.jsx';
 import Mission2SubNav from '../../components/mission2/Mission2SubNav.jsx';
@@ -14,19 +14,45 @@ import HeightBadge from '../../components/mission2/HeightBadge.jsx';
 import ConstraintBadge from '../../components/mission2/ConstraintBadge.jsx';
 import { useToast } from '../../components/feedback/Toast.jsx';
 import { Users, Plus, Search, Download, Upload, ChevronLeft, ChevronRight } from 'lucide-react';
-import { STUDENTS } from '../../mocks/data/mission2.js';
+import { getLatestPlan } from '../../services/seatsService.js';
+import { mapSeatPlanFromApi } from '../../utils/missionApiMaps.js';
 
 const PAGE_SIZE = 8;
 
 export default function StudentManagement() {
   const toast = useToast();
-  const [students, setStudents] = useState(STUDENTS);
+  const [students, setStudents] = useState([]);
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('all');
   const [sort, setSort] = useState('name');
   const [page, setPage] = useState(1);
   const [editing, setEditing] = useState(undefined); // undefined = closed; null = add; obj = edit
   const [deleteTarget, setDeleteTarget] = useState(null);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const res = await getLatestPlan();
+        if (!alive) return;
+        const plan = mapSeatPlanFromApi(res?.data || res);
+        const nextStudents = (plan?.seats || []).map((seat) => ({
+          id: seat.id,
+          name: seat.student.name,
+          roll: seat.rollNumber,
+          height: seat.student.height,
+          gender: '—',
+          vision: seat.hasVisionProblem ? 'Required' : 'None',
+          hearing: seat.hasHearingProblem ? 'Required' : 'None',
+          notes: seat.notes,
+        }));
+        setStudents(nextStudents);
+      } catch {
+        if (alive) setStudents([]);
+      }
+    })();
+    return () => { alive = false; };
+  }, []);
 
   const filtered = useMemo(() => {
     let list = students.filter((s) => {

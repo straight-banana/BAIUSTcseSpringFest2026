@@ -3,6 +3,9 @@ import PageHeader from '../../components/layout/PageHeader.jsx';
 import Card from '../../components/common/Card.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { STUDENTS, CLASSROOM_SIZES, buildSeatingPlan, HIGHLIGHTED_STUDENT_ID } from '../../mocks/data/mission2.js';
+import { useEffect, useState } from 'react';
+import { getLatestPlan } from '../../services/seatsService.js';
+import { mapSeatPlanFromApi } from '../../utils/missionApiMaps.js';
 import { cx } from '../../utils/index.js';
 
 /**
@@ -13,15 +16,29 @@ import { cx } from '../../utils/index.js';
 export default function StudentSeatView() {
   const { user } = useAuth();
 
-  // Match by roll if available, else fall back to the demo highlight.
-  const me =
-    STUDENTS.find((s) => user?.rollId && s.roll === user.rollId) ||
-    STUDENTS.find((s) => s.id === HIGHLIGHTED_STUDENT_ID) ||
-    STUDENTS[0];
+  const [apiPlan, setApiPlan] = useState(null);
+  const [seats, setSeats] = useState(() => buildSeatingPlan(CLASSROOM_SIZES[1].rows, CLASSROOM_SIZES[1].cols));
 
-  const room = CLASSROOM_SIZES[1]; // 6x6
-  const seats = buildSeatingPlan(room.rows, room.cols);
-  const mySeat = seats.find((s) => s.student?.id === me.id);
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const res = await getLatestPlan();
+        if (!alive) return;
+        const plan = mapSeatPlanFromApi(res?.data || res);
+        if (plan) {
+          setApiPlan(plan);
+          setSeats(plan.seats || []);
+        }
+      } catch {}
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  // Match by roll if available, else fall back to the demo highlight.
+  const meCandidate = (apiPlan ? (apiPlan.seats || []).map(s => s.student).find(st => st && ((user?.rollId && st.rollNumber === user.rollId) || st.id === undefined)) : null);
+  const me = meCandidate || STUDENTS.find((s) => user?.rollId && s.roll === user.rollId) || STUDENTS.find((s) => s.id === HIGHLIGHTED_STUDENT_ID) || STUDENTS[0];
+  const mySeat = seats.find((s) => s.student && (s.student.id === me.id || s.student.rollNumber === me.roll));
 
   return (
     <PageContainer>

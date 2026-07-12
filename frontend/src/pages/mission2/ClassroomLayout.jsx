@@ -10,10 +10,36 @@ import ClassroomLegend from '../../components/mission2/ClassroomLegend.jsx';
 import Button from '../../components/common/Button.jsx';
 import { LayoutGrid, Save, Sparkles, Plus } from 'lucide-react';
 import { useToast } from '../../components/feedback/Toast.jsx';
-import { CLASSROOM_SIZES, buildSeatingPlan, STUDENTS } from '../../mocks/data/mission2.js';
+import { getLatestPlan } from '../../services/seatsService.js';
+import { mapSeatPlanFromApi } from '../../utils/missionApiMaps.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 
 const CUSTOM_KEY = 'akp:customLayouts';
+
+// fallback classroom sizes
+const CLASSROOM_SIZES = [
+  { id: '5x6', label: '5 × 6', rows: 5, cols: 6 },
+  { id: '6x6', label: '6 × 6', rows: 6, cols: 6 },
+  { id: '7x8', label: '7 × 8', rows: 7, cols: 8 },
+];
+
+function buildSeatingPlan(rows, cols, students = []) {
+  const seats = [];
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const id = `${r}-${c}`;
+      const idx = r * cols + c;
+      seats.push({
+        id,
+        row: r,
+        col: c,
+        label: `${String.fromCharCode(65 + r)}${c + 1}`,
+        student: students[idx] || null,
+      });
+    }
+  }
+  return seats;
+}
 
 export default function ClassroomLayout() {
   const toast = useToast();
@@ -29,7 +55,35 @@ export default function ClassroomLayout() {
   const allSizes = useMemo(() => [...CLASSROOM_SIZES, ...custom], [custom]);
   const [sizeId, setSizeId] = useState('7x8');
   const size = allSizes.find((s) => s.id === sizeId) || allSizes[0];
-  const seats = useMemo(() => buildSeatingPlan(size.rows, size.cols, STUDENTS), [size]);
+  const [apiPlan, setApiPlan] = useState(null);
+  const seats = useMemo(() => {
+    if (apiPlan) return apiPlan.seats || [];
+    return buildSeatingPlan(size.rows, size.cols, []);
+  }, [size, apiPlan]);
+
+    useEffect(() => {
+      let alive = true;
+      (async () => {
+        try {
+          const res = await getLatestPlan();
+          if (!alive) return;
+          const plan = mapSeatPlanFromApi(res?.data || res);
+          if (plan) {
+            setApiPlan(plan);
+            // if plan contains grid info, try to set a matching size id
+            const grows = plan.summary?.gridRows || plan.gridRows || (plan.seats?.length ? Math.max(...plan.seats.map(s => s.row)) + 1 : null);
+            const gcols = plan.summary?.gridCols || plan.gridCols || (plan.seats?.length ? Math.max(...plan.seats.map(s => s.col)) + 1 : null);
+            if (grows && gcols) {
+              const matchId = `${grows}x${gcols}`;
+              if (!allSizes.find((s) => s.id === matchId)) setSizeId(matchId);
+            }
+          }
+        } catch {
+          // ignore and keep local fallback
+        }
+      })();
+      return () => { alive = false; };
+    }, []);
   const [selected, setSelected] = useState(null);
 
   const [showNew, setShowNew] = useState(false);

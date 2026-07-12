@@ -1,7 +1,7 @@
 import Badge from '../ui/Badge.jsx';
-import { findStatus } from '../../mocks/data/mission5.js';
+import { sosStatusBadge } from '../../utils/missionApiMaps.js';
 
 export default function SosStatusBadge({ status }) {
-  const s = findStatus(status);
+  const s = sosStatusBadge(status);
   return <Badge tone={s.tone}>{s.label}</Badge>;
 }

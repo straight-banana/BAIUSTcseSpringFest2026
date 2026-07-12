@@ -12,18 +12,45 @@ import SosStatusBadge from '../../components/mission5/SosStatusBadge.jsx';
 import SeverityBadge from '../../components/mission5/SeverityBadge.jsx';
 import AlertDrawer from '../../components/mission5/AlertDrawer.jsx';
 import CampusMap from '../../components/mission5/CampusMap.jsx';
-import { ALERTS, SUMMARY, findLocation, findType } from '../../mocks/data/mission5.js';
+import { listAllSos, getSosAnalytics } from '../../services/sosService.js';
+import { mapSosAlertFromApi } from '../../utils/missionApiMaps.js';
 
 export default function CaptainDashboard() {
   const [tab, setTab] = useState('active');
   const [drawer, setDrawer] = useState(null);
+  const [alerts, setAlerts] = useState([]);
+  const [summary, setSummary] = useState({ active: 0, pending: 0, resolved: 0, avgResponse: '—' });
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const a = await listAllSos();
+        if (!alive) return;
+        const mapped = (a?.data?.alerts || a?.alerts || []).map(mapSosAlertFromApi).filter(Boolean);
+        setAlerts(mapped);
+      } catch {
+        if (alive) setAlerts([]);
+      }
+    })();
+    (async () => {
+      try {
+        const s = await getSosAnalytics();
+        if (!alive) return;
+        setSummary(s?.data || s || {});
+      } catch {
+        if (alive) setSummary({ active: 0, pending: 0, resolved: 0, avgResponse: '—' });
+      }
+    })();
+    return () => { alive = false; };
+  }, []);
 
   const filtered = useMemo(() => {
-    if (tab === 'active')   return ALERTS.filter((a) => ['pending','received','responding'].includes(a.status));
-    if (tab === 'pending')  return ALERTS.filter((a) => a.status === 'pending');
-    if (tab === 'resolved') return ALERTS.filter((a) => a.status === 'resolved');
-    return ALERTS;
-  }, [tab]);
+    if (tab === 'active')   return alerts.filter((a) => ['pending','received','responding'].includes(a.status));
+    if (tab === 'pending')  return alerts.filter((a) => a.status === 'pending');
+    if (tab === 'resolved') return alerts.filter((a) => a.status === 'resolved');
+    return alerts;
+  }, [tab, alerts]);
 
   return (
     <PageContainer>
@@ -35,10 +62,10 @@ export default function CaptainDashboard() {
       <Mission5SubNav />
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <StatCard icon={<Activity size={16} />}      label="Active Alerts"    value={SUMMARY.active} hint="Needs attention" trend={12} />
-        <StatCard icon={<AlertTriangle size={16} />} label="Pending"          value={SUMMARY.pending} hint="Not yet accepted" />
-        <StatCard icon={<CheckCircle2 size={16} />}  label="Resolved"         value={SUMMARY.resolved} hint="This term" trend={4.1} />
-        <StatCard icon={<Clock size={16} />}         label="Avg Response"     value={SUMMARY.avgResponse} hint="Rolling 7 days" trend={-8} />
+        <StatCard icon={<Activity size={16} />}      label="Active Alerts"    value={summary.active} hint="Needs attention" trend={12} />
+        <StatCard icon={<AlertTriangle size={16} />} label="Pending"          value={summary.pending} hint="Not yet accepted" />
+        <StatCard icon={<CheckCircle2 size={16} />}  label="Resolved"         value={summary.resolved} hint="This term" trend={4.1} />
+        <StatCard icon={<Clock size={16} />}         label="Avg Response"     value={summary.avgResponse} hint="Rolling 7 days" trend={-8} />
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 mt-6">
@@ -79,10 +106,10 @@ export default function CaptainDashboard() {
                       >
                         <td className="px-4 py-3">
                           <p className="text-xs font-mono text-fg">{a.id}</p>
-                          <p className="text-[11px] text-subtle">{findType(a.type).icon} {findType(a.type).label}</p>
+                          <p className="text-[11px] text-subtle">{a.type}</p>
                         </td>
                         <td className="px-4 py-3 text-xs text-muted font-mono">{a.student}</td>
-                        <td className="px-4 py-3 text-sm">{findLocation(a.location).icon} {findLocation(a.location).label}</td>
+                        <td className="px-4 py-3 text-sm">{a.location}</td>
                         <td className="px-4 py-3 text-xs text-muted whitespace-nowrap">{new Date(a.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
                         <td className="px-4 py-3"><SeverityBadge severity={a.severity} /></td>
                         <td className="px-4 py-3"><SosStatusBadge status={a.status} /></td>

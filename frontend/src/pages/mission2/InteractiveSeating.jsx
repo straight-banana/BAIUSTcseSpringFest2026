@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import PageContainer from '../../components/layout/PageContainer.jsx';
 import PageHeader from '../../components/layout/PageHeader.jsx';
 import Mission2SubNav from '../../components/mission2/Mission2SubNav.jsx';
@@ -8,12 +8,34 @@ import ClassroomGrid from '../../components/mission2/ClassroomGrid.jsx';
 import ClassroomLegend from '../../components/mission2/ClassroomLegend.jsx';
 import { useToast } from '../../components/feedback/Toast.jsx';
 import { MousePointerClick, RotateCcw, Save } from 'lucide-react';
-import { CLASSROOM_SIZES, buildSeatingPlan, STUDENTS } from '../../mocks/data/mission2.js';
+import { CLASSROOM_SIZES as FALLBACK_SIZES, buildSeatingPlan as buildFallbackPlan } from '../../mocks/data/mission2.js';
+import { getLatestPlan } from '../../services/seatsService.js';
+import { mapSeatPlanFromApi } from '../../utils/missionApiMaps.js';
 
 export default function InteractiveSeating() {
   const toast = useToast();
-  const size = CLASSROOM_SIZES[1]; // 6x6
-  const [seats, setSeats] = useState(() => buildSeatingPlan(size.rows, size.cols, STUDENTS.slice(0, 30)));
+  const size = FALLBACK_SIZES[1]; // 6x6
+  const [apiPlan, setApiPlan] = useState(null);
+  const [seats, setSeats] = useState(() => buildFallbackPlan(size.rows, size.cols, []));
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const res = await getLatestPlan();
+        if (!alive) return;
+        const plan = mapSeatPlanFromApi(res?.data || res);
+        if (plan) setApiPlan(plan);
+      } catch {
+        // ignore
+      }
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  useEffect(() => {
+    if (apiPlan) setSeats(apiPlan.seats || []);
+  }, [apiPlan]);
   const [dragging, setDragging] = useState(null);
   const [selected, setSelected] = useState(null);
 
@@ -35,7 +57,7 @@ export default function InteractiveSeating() {
     setDragging(null);
   };
   const reset = () => {
-    setSeats(buildSeatingPlan(size.rows, size.cols, STUDENTS.slice(0, 30)));
+    setSeats(buildFallbackPlan(size.rows, size.cols, []));
     toast.push({ tone: 'info', title: 'Layout reset' });
   };
 
