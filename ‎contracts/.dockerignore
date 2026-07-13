@@ -1,0 +1,38 @@
+# Version Control
+.git
+.gitignore
+
+# Python caching & environments
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+venv/
+.venv/
+env/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Local databases & pre-computed caches
+app/data/school_rules.db
+app/data/.cache/
+
+# Local configuration & environment variables
+.env
+.env.*
+!.env.example
+
+# IDE / Editor configurations
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Documentation & packaging artifacts
+Dockerfile
+.dockerignore
+walkthrough.md
+task.md
+implementation_plan.md
