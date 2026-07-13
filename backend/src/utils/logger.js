@@ -2,8 +2,18 @@
 
 const winston = require('winston');
 const path = require('path');
+const fs = require('fs');
 
 const { combine, timestamp, printf, colorize, errors } = winston.format;
+
+// Winston's File transport doesn't create its own directory — make sure
+// it exists so a fresh clone/deploy doesn't crash on startup with ENOENT.
+const logsDir = path.join(process.cwd(), 'logs');
+try {
+  if (!fs.existsSync(logsDir)) fs.mkdirSync(logsDir, { recursive: true });
+} catch {
+  // Non-fatal — file transports below will surface their own error if this failed.
+}
 
 const logFormat = printf(({ level, message, timestamp: ts, stack }) => {
   return `${ts} [${level}]: ${stack || message}`;

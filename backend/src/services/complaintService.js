@@ -35,12 +35,12 @@ async function createComplaint({ category, description, anonymous, reportedById,
       reportedById: anonymous === false ? reportedById : null,
       offenderId: offenderId || null,
       imageUrl,
-      statusHistory: JSON.stringify([{
+      statusHistory: [{
         status: 'PENDING',
         changedAt: new Date().toISOString(),
         changedBy: 'system',
         note: 'Complaint submitted',
-      }]),
+      }],
     },
     select: {
       id: true, referenceCode: true, category: true, description: true,

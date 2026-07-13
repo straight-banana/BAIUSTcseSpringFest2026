@@ -12,7 +12,7 @@ async function addEntry({ type, amount, description, paymentMethod, userId }) {
       paymentMethod: paymentMethod || 'CASH',
       status: 'COMPLETED',
       userId: userId || null,
-      auditHistory: JSON.stringify([{ action: 'CREATED', at: new Date().toISOString() }]),
+      auditHistory: [{ action: 'CREATED', at: new Date().toISOString() }],
     },
   });
   return entry;

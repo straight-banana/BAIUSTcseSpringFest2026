@@ -1,6 +1,7 @@
 'use strict';
 
 const authService = require('../services/authService');
+const { revokeToken } = require('../middleware/tokenBlacklist');
 
 async function register(req, res, next) {
   try {
@@ -24,7 +25,7 @@ async function refreshToken(req, res, next) {
   try {
     const { refreshToken } = req.body;
     const tokens = await authService.refreshToken(refreshToken);
-    res.json({ status: 'success', data: tokens });
+    res.json({ status: 'success', data: { token: tokens.accessToken, refreshToken: tokens.refreshToken } });
   } catch (error) {
     next(error);
   }
@@ -33,6 +34,7 @@ async function refreshToken(req, res, next) {
 async function logout(req, res, next) {
   try {
     await authService.logout(req.user.id);
+    if (req.token) revokeToken(req.token, req.user.exp);
     res.json({ status: 'success', message: 'Logged out successfully' });
   } catch (error) {
     next(error);
