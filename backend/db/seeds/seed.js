@@ -65,6 +65,20 @@ async function main() {
   });
   console.log('✅ Admin created: ADMIN / admin123');
 
+  // Teacher / office account (custom login)
+  const teacherHash = await bcrypt.hash('1234', SALT_ROUNDS);
+  await prisma.user.upsert({
+    where: { rollNumber: 't101' },
+    update: {},
+    create: {
+      rollNumber: 't101',
+      name: 'Teacher / Office',
+      passwordHash: teacherHash,
+      role: 'ADMIN',
+    },
+  });
+  console.log('✅ Teacher/Office account created: t101 / 1234');
+
   // Students
   for (const s of students) {
     const hash = await bcrypt.hash('student123', SALT_ROUNDS);
