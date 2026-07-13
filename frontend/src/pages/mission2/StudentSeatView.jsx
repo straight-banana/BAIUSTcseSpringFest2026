@@ -58,7 +58,7 @@ export default function StudentSeatView() {
             </div>
             <div
               className="grid gap-1.5"
-              style={{ gridTemplateColumns: `repeat(${room.cols}, minmax(0, 1fr))` }}
+              style={{ gridTemplateColumns: `repeat(${apiPlan?.gridCols || CLASSROOM_SIZES[1].cols}, minmax(0, 1fr))` }}
             >
               {seats.map((seat) => {
                 const mine = seat.student?.id === me.id;

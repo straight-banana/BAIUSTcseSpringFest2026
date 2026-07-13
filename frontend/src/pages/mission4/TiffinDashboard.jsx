@@ -13,6 +13,7 @@ import CurrencyWidget from '../../components/mission4/CurrencyWidget.jsx';
 import ChartContainer from '../../components/mission4/ChartContainer.jsx';
 import { getBudgets, getMenu } from '../../services/trackerService.js';
 import { formatBDT } from '../../utils/missionApiMaps.js';
+import { FOOD_WEEK } from '../../mocks/data/mission4.js';
 
 const COLORS = ['#FF8F00', '#FBC02D', '#C62828', '#4C8C2B', '#8B5CF6', '#0891B2'];
 const axisStyle = { fontSize: 11, fill: 'rgb(var(--muted))' };

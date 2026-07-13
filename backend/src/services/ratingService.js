@@ -65,10 +65,7 @@ async function getMyRated(raterId) {
   // Who I've already rated — returns ratee profiles only
   const records = await prisma.ratingRecord.findMany({
     where: { raterId },
-    select: {
-      rateeId: true,
-      rater: { select: {} }, // not exposed
-    },
+    select: { rateeId: true },
   });
   const rateeIds = records.map(r => r.rateeId);
   if (!rateeIds.length) return [];
