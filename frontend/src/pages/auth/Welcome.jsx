@@ -68,6 +68,10 @@ export default function Welcome() {
           </Link>
         </div>
         <p className="mt-6 text-xs text-muted">
+          Teacher or office staff?{' '}
+          <Link to="/auth/staff-login" className="text-brand hover:underline">Sign in here</Link>
+        </p>
+        <p className="mt-2 text-xs text-muted">
           Trouble signing in? Contact your class captain or department office.
         </p>
       </div>

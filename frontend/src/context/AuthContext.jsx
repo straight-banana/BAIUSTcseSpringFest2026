@@ -11,7 +11,10 @@ const USER_KEY = 'akp:user';
 function normalizeRole(r) {
   if (!r) return null;
   const v = String(r).toLowerCase();
-  if (v === 'admin') return 'office';
+  // Backend only has STUDENT/ADMIN — no staffRole field to distinguish
+  // "office" from "teacher". Land ADMIN accounts on the teacher panel by
+  // default; both roles carry identical '*' permissions either way.
+  if (v === 'admin') return 'teacher';
   return v;
 }
 

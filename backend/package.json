@@ -4,7 +4,8 @@
   "description": "Hackathon backend — Anonymous Complaints, Seat Planner, Money Tracker, SOS Alerts",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
+    "postinstall": "npx prisma generate --schema=db/schema.prisma",
+    "start": "npx prisma migrate deploy --schema=db/schema.prisma && node server.js",
     "dev": "node --watch server.js",
     "db:generate": "npx prisma generate --schema=db/schema.prisma",
     "db:push": "npx prisma db push --schema=db/schema.prisma",

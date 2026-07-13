@@ -16,6 +16,7 @@ const Landing = lazy(() => import('../pages/Landing.jsx'));
 // Auth flow (only hit once, keep out of main bundle)
 const Welcome = lazy(() => import('../pages/auth/Welcome.jsx'));
 const RollLogin = lazy(() => import('../pages/auth/RollLogin.jsx'));
+const StaffLogin = lazy(() => import('../pages/auth/StaffLogin.jsx'));
 const Register = lazy(() => import('../pages/auth/Register.jsx'));
 const RoleSelect = lazy(() => import('../pages/auth/RoleSelect.jsx'));
 const AuthLoading = lazy(() => import('../pages/auth/AuthLoading.jsx'));
@@ -235,6 +236,7 @@ export default function AppRoutes() {
         <Route path="/landing" element={<Navigate to="/" replace />} />
         <Route path="/auth/welcome" element={<Welcome />} />
         <Route path="/auth/login" element={<RollLogin />} />
+        <Route path="/auth/staff-login" element={<StaffLogin />} />
         <Route path="/auth/register" element={<Register />} />
         <Route path="/auth/role" element={<RoleSelect />} />
         <Route path="/auth/loading" element={<AuthLoading />} />

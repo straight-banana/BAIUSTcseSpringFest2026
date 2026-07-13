@@ -57,7 +57,8 @@ export default function RollLogin() {
             Don't have an account?{' '}
             <Link to="/auth/register" className="text-brand hover:underline">Register as student</Link>
             <br />
-            Office/admin accounts sign in here too, with their roll number.
+            Teacher or office staff?{' '}
+            <Link to="/auth/staff-login" className="text-brand hover:underline">Sign in here</Link>
           </span>
         }
       >
